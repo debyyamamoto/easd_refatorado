@@ -1,0 +1,17 @@
+heart disease Cleveland
+
+   -- Only 14 used
+      -- 1. #3  (age)  Real    
+      -- 2. #4  (sex)  Categoric 
+      -- 3. #9  (cp)   Categoric     
+      -- 4. #10 (trestbps) Real  
+      -- 5. #12 (chol)     Real
+      -- 6. #16 (fbs)  Categoric    
+      -- 7. #19 (restecg) Categoric   
+      -- 8. #32 (thalach) Real
+      -- 9. #38 (exang)   Categoric 
+      -- 10. #40 (oldpeak)Real
+      -- 11. #41 (slope)  Categoric   
+      -- 12. #44 (ca)     Categoric
+      -- 13. #51 (thal)   Categoric 
+      -- 14. #58 (num) Class

@@ -1,0 +1,5 @@
+Rule_Ant,Rule_Pos,Rule_Index,Class_Label,Support,Confidence,Significance,Wracc
+0,"['A14', 'A13']",0,1,0.5671,0.8687,171.4467,0.3084
+5,"['A61', 'A62']",0,2, , , , 
+19,['A201'],0,2, , , , 
+0,"['A12', 'A11']",0,2,0.6867,0.4988,209.4614,0.3284

@@ -1,0 +1,23 @@
+labels,Size
+Total,309
+lung,81
+breast,18
+ovary,19
+colon,14
+prostate,8
+head and neck,14
+thyroid,14
+pancreas,28
+liver,7
+kidney,23
+salivary glands,2
+rectum,6
+gallbladder,15
+stomach,38
+esophagus,9
+corpus uteri,6
+testis,1
+cervix uteri,2
+duoden and sm.int,1
+bladder,2
+vagina,1
