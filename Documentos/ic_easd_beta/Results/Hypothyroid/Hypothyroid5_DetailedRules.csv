@@ -1,0 +1,4 @@
+Rule_Ant,Rule_Pos,Rule_Index,Class_Label,Support,Confidence,Significance,Wracc
+22,"[0.0, 68.0]",0,hypothyroid, , , , 
+11,['f'],0,hypothyroid,0.9672,0.5871,535.7774,0.2104
+14,"[0.0, 6.2999999999999998]",0,negative,0.9222,0.9983,212.0629,0.2045

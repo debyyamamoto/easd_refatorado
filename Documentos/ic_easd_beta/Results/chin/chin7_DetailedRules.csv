@@ -1,0 +1,3 @@
+Rule_Ant,Rule_Pos,Rule_Index,Class_Label,Support,Confidence,Significance,Wracc
+9115,"[6.7835779999999994, 8.120277999999999]",0,negative,0.6512,0.875,49.0534,0.5539
+17575,"[10.981913, 12.935350999999999]",0,positive,0.9067,0.8395,37.8427,0.5599

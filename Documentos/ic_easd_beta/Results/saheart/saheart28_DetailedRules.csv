@@ -1,0 +1,4 @@
+Rule_Ant,Rule_Pos,Rule_Index,Class_Label,Support,Confidence,Significance,Wracc
+8,"[49.0, 64.0]",0,1,0.6438,0.5309,88.016,0.3101
+8,"[15.0, 37.0]",0,0,0.4404,0.8693,75.8231,0.2856
+4,['Absent'],1,0,0.6821,0.763,63.6919,0.2555

@@ -1,0 +1,15 @@
+Rule_Ant,Rule_Pos,Rule_Index,Class_Label,Support,Confidence,Significance,Wracc
+8,['1'],0,malign_lymph, , , , 
+16,['yes'],0,malign_lymph, , , , 
+12,"['lac_central', 'lacunar']",0,malign_lymph,0.7049,0.8776,64.9918,0.6163
+1,['yes'],0,metastases, , , , 
+12,"['lac_margin', 'lacunar']",0,metastases, , , , 
+6,['no'],0,metastases, , , , 
+17,"['1', '2', '3', '6']",0,metastases,0.7037,0.95,62.8676,0.653
+0,['deformed'],0,fibrosis, , , , 
+12,"['lacunar', 'no']",0,fibrosis, , , , 
+4,['yes'],0,fibrosis, , , , 
+11,"['lacunar', 'lac_central']",0,fibrosis,1.0,1.0,28.8873,0.1052
+1,['no'],0,normal, , , , 
+11,['no'],0,normal, , , , 
+15,['no'],0,normal,1.0,1.0,17.2163,0.0533
