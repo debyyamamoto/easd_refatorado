@@ -1,3 +1,0 @@
-Rule_Ant,Rule_Pos,Rule_Index,Class_Label,Support,Confidence,Significance,Wracc
-3,['y'],0,republican,0.9702,0.9209,283.2883,0.8703
-3,['n'],0,democrat,0.9176,0.9919,235.184,0.8588

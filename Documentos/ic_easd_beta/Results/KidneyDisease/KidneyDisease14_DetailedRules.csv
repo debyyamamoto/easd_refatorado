@@ -1,6 +1,0 @@
-Rule_Ant,Rule_Pos,Rule_Index,Class_Label,Support,Confidence,Significance,Wracc
-15,"[18.0, 40.0]",0,ckd, , , , 
-14,"[5.5999999999999996, 13.4]",0,ckd,0.931,1.0,145.811,0.8985
-3,"['0', '?']",0,notckd, , , , 
-18,['no'],0,notckd, , , , 
-2,"['1.020', '1.025', '?']",0,notckd,0.9843,0.9921,128.4552,0.9388

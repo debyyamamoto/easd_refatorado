@@ -1,3 +1,0 @@
-Rule_Ant,Rule_Pos,Rule_Index,Class_Label,Support,Confidence,Significance,Wracc
-8300,"[35.899999999999999, 161.30000000000001]",0,MRI-no-lytic-lesion sample,0.8889,0.3137,26.2743,0.2491
-10018,"[167.5, 1735.5]",0,MRI-lytic-lesion sample,0.7007,0.8807,20.4117,0.2239

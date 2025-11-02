@@ -1,4 +1,0 @@
-Rule_Ant,Rule_Pos,Rule_Index,Class_Label,Support,Confidence,Significance,Wracc
-6570,"[856.5, 1916.3]",0,mesothelioma,0.5806,1.0,63.5224,0.3297
-12147,"[366.0, 1726.0999999999999]",0,adenocarcinoma, , , , 
-10211,"[72.700000000000003, 138.19999999999999]",0,adenocarcinoma,0.8067,0.9837,41.4952,0.4214

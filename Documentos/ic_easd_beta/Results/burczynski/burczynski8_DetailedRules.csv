@@ -1,5 +1,0 @@
-Rule_Ant,Rule_Pos,Rule_Index,Class_Label,Support,Confidence,Significance,Wracc
-10998,"[139.53700000000001, 229.637]",0,normal,0.7857,0.7333,52.5599,0.5706
-413,"[933.01199999999994, 1297.787]",0,ulcerative colitis, , , , 
-302,"[936.68499999999995, 1117.568]",0,ulcerative colitis,0.5769,0.6818,36.0929,0.3306
-11838,"[264.209, 433.88499999999999]",0,Crohn's disease,0.6949,0.7593,40.2815,0.5012
