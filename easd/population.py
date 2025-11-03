@@ -2,6 +2,7 @@ import random as rd
 import copy
 import pandas as pd
 
+
 class PopulationGenerator:
     def gen_interval(self, continuous_attribute):
         if continuous_attribute >= 0:

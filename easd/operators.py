@@ -44,6 +44,7 @@ class GeneticOperators:
     def to_mutate_discrete(self, discrete_atr, attribute_domain, mutation_option):
         new_discrete = []
         
+        
         if mutation_option == 1:
             for i in range(len(discrete_atr)):
                 new_discrete.append(discrete_atr[i])

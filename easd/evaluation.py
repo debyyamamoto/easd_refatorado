@@ -89,6 +89,7 @@ class RuleEvaluator:
 
         return list(final_fitness)
 
+
     def uncovered_lines_by_class(self, population, dataset):
         covered_lines_by_class = []
         for rule in population:

@@ -33,6 +33,7 @@ class EASD:
         
         seed(self.seed)
 
+
     def clean_and_convert(self, x_data):
         dfx = pd.DataFrame(x_data)
         for i in range(len(dfx.columns)):

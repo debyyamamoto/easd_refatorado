@@ -27,6 +27,7 @@ class ResultsFormatter:
         
         return pd.DataFrame(info, columns=columns)
 
+
     def give_rules_details(self, final_measures, labels, rules):
         columns = ["Rule_Ant", "Rule_Pos", "Rule_Index", "Class_Label", "Support", "Confidence", "Significance", "Wracc"]
         info = []
