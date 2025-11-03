@@ -42,7 +42,7 @@ class EASD:
 
     def get_classes(self, x_data, y_data):
         dataset_by_class = []
-        classes = pd.unique(y_data)
+        classes = pd.Series(y_data).unique
         for label in range(len(classes)):
             label_spot = []
             dataset_by_class.append(label_spot)

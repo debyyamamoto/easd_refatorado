@@ -47,7 +47,7 @@ class GeneticOperators:
         if mutation_option == 1:
             for i in range(len(discrete_atr)):
                 new_discrete.append(discrete_atr[i])
-            unique_values = pd.unique(attribute_domain)
+            unique_values = pd.Series(attribute_domain).unique()
             if len(new_discrete) < len(unique_values):
                 while True:
                     idx_discr = rd.randint(0, len(unique_values) - 1)
