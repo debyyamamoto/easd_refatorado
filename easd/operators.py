@@ -206,17 +206,17 @@ class GeneticOperators:
 
         return offspring1, offspring2
 
-    def check_subst(self, population, dataset, dataset_by_class, y, parents_index, offsprings, fitness_list, df):
+    def check_subst(self, population, dataset_x, parents_index, offsprings, fitness_list, df):
+        """
+        Substituir indivíduos da população atual por filhos (offsprints) gerados, baseados na qualidade de cada um 
+        """
         p_fit = []
         offs_fit = []
         
         for offspring in offsprings:
-            offs_fit.append(self.evaluator.fitness(offspring, dataset, dataset_by_class, y))
+            offs_fit.append(self.evaluator.fitness(offspring, dataset_x))
         
-        prct_punish = self.evaluator.coverage_punishment(offsprings, 10, df)
-        offs_fit_np = np.array(offs_fit)
-        final_offs_fit = offs_fit_np - prct_punish
-        final_offs_fit = list(final_offs_fit)
+        final_offs_fit = list(offs_fit)
 
         for i in range(len(parents_index)):
             p_fit.append(fitness_list[parents_index[i]])
@@ -249,7 +249,7 @@ class GeneticOperators:
                     
         return population, fitness_list
 
-    def crossover(self, population, prct, fitness_list, dataset, dataset_by_class, y, df):
+    def crossover(self, population, prct, fitness_list, dataset_x, df_full):
         for i in range(len(population)):
             pm = rd.randint(1, 100)
             if pm <= (prct * 100):
@@ -265,19 +265,16 @@ class GeneticOperators:
                 
                 if min(len(parent1[0]), len(parent2[0])) > 1:
                     offspring1, offspring2 = self.single_point_crossover(parent1, parent2)
-                    population, fitness_list = self.check_subst(population, dataset, dataset_by_class, y, 
-                                                              parents_index, [offspring1, offspring2], fitness_list, df)
+                    population, fitness_list = self.check_subst(population, dataset_x, parents_index, [offspring1, offspring2], fitness_list, df_full)
                 else:
                     if (len(parent1[0]) == len(parent2[0])) and (parent1[0] == parent2[0]):
                         pass
                     else:
                         if len(parent1[0]) == 1:
                             offspring = self.crossover1(parent1, parent2)
-                            population, fitness_list = self.check_subst(population, dataset, dataset_by_class, y, 
-                                                                      parents_index, [offspring], fitness_list, df)
+                            population, fitness_list = self.check_subst(population, dataset_x, parents_index, [offspring], fitness_list, df_full)
                         else:
                             offspring = self.crossover1(parent2, parent1)
-                            population, fitness_list = self.check_subst(population, dataset, dataset_by_class, y, 
-                                                                      parents_index, [offspring], fitness_list, df)
+                            population, fitness_list = self.check_subst(population, dataset_x, parents_index, [offspring], fitness_list, df_full)
 
         return population, fitness_list

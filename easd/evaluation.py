@@ -1,114 +1,97 @@
 import numpy as np
 import pandas as pd
-
+from .dataset import Dataset 
+import statsmodels.api as sm
 class RuleEvaluator:
-    def coverage_punishment(self, rules, prct_punish, df):
-        rules_cov_prct = []
-        for rule in rules:
-            atr_cov_prct = []
-            cnt = 0
-            for j in range(len(rule[0])):
-                index = rule[0][j]
-                if type(rule[1][j][0]) != str:
-                    dif = np.max(df[index]) - np.min(df[index])
-                    int_size = rule[1][j][1] - rule[1][j][0]
-                    covered_percentage = round(((int_size / dif) * 100), 2)
-                    if covered_percentage > prct_punish:
-                        cnt += 1
-                        atr_cov_prct.append(covered_percentage - prct_punish)
-                else:
-                    d_num = len(pd.unique(df[index]))
-                    p_size = len(rule[1][j])
-                    covered_percentage = round(((p_size / d_num) * 100), 2)
-                    if covered_percentage > 50:
-                        cnt += 1
-                        atr_cov_prct.append(covered_percentage - 50)
-            
-            if cnt == 0:
-                rules_cov_prct.append(0)
-            else:
-                rules_cov_prct.append(((np.mean(atr_cov_prct))) / 100)
+    def __init__(self, dataset_obj : Dataset, comparacao):
+        self.dataset_obj = dataset_obj
+        self.comparacao = comparacao
+        self.sub_group_cases = dataset_obj.get_instances()
+        self.p_value = None
+        self._fitness = 0.0
+        self._all_indices = set(range(self.dataset_obj.size))
 
-        return np.array(rules_cov_prct)
+        # pré-computar os dados de tempo e eventos
+        self._survivel_times = dataset_obj.survival_times[1]
+        self._events = dataset_obj.events[1]
+        # pré-computar a população complementar
+        if comparacao == "complement":
+            all_indices = set(range(len(self.dataset_obj.survival_times[1])))
+            self._complement_cases = list(all_indices - set(self.sub_group_cases))
 
-    def uncovered_by_rule(self, rule, dataset):
-        coverage_count = 0
-        for row in range(len(dataset)):
-            tmp_cov = 0
-            for index in range(len(rule[0])):
-                if type(rule[1][index][0]) == str:
-                    if (len(rule[1][index]) > 1):
-                        if dataset[row][rule[0][index]] in rule[1][index]:
-                            tmp_cov += 1
+    def get_covered_indices(self, rule, dataset):
+        # verificação se rule obedece o formato esperado: indices e valores
+        if not rule or len(rule) < 2 or len(rule[0]) != len(rule[1]):
+            return []
+        indices, values = rule[0], rule[1]
+        n_rows = dataset.shape[0]
+
+        mask = np.ones(n_rows, dtype=bool)
+
+        for idx, val in zip(indices, values):
+                col_data = dataset[:, idx]
+                if isinstance(val[0], str):
+                    if (len(val) > 1):
+                        row_mask = np.isin(col_data, val)
                     else:
-                        if dataset[row][rule[0][index]] == rule[1][index][0]:
-                            tmp_cov += 1
+                        row_mask = col_data == val[0]
                 else:
-                    if (dataset[row][rule[0][index]] >= rule[1][index][0]) and (dataset[row][rule[0][index]] <= rule[1][index][1]):
-                        tmp_cov += 1
-            if len(rule[0]) == tmp_cov:
-                coverage_count += 1
+                    row_mask = (col_data >= val[0]) & (col_data <= val[1])
+                mask &= row_mask
+        return np.where(mask)[0].tolist()
 
-        return coverage_count
+    def fitness(self, rule, dataset_x):
+        "Recebe uma regra e calcula o seu fitness"
+        # Pensar em como adaptar para uma regra só 
+        # separar o grupo que possui uma determinada regra e comparar com o basegroup escolhido 
+        indices_group_regra = []
+        indices_group_regra = self.get_covered_indices(rule, dataset_x)
+        p_value = 1.0
 
-    def get_measures(self, rule, dataset, dataset_by_class, y):
-        n_class_j_condition = self.uncovered_by_rule(rule, dataset)
-        n_condition = 0
+        if len(indices_group_regra) < 1:
+            return 0.0
+        
+        indices_complemento_regra = list(self._all_indices - set(indices_group_regra))
 
-        for dt in dataset_by_class:
-            tmp_n_cond = self.uncovered_by_rule(rule, dt)
-            n_condition += tmp_n_cond
+        if len(indices_complemento_regra) < 1:
+            return 0.0
+        # passo para garantir que 
+        if self.comparacao == 'population':
+            try:
+                times = self._survivel_times.to_list()
+                events = self._events.to_list()
+                group_id = ['sg' if i in set(indices_group_regra) else 'pop' 
+                            for i in range(len(times))]
 
-        if n_class_j_condition == 0:
-            sig = 0
-            confidence = 0
-            wracc = 0
-        else:
-            sig = (n_class_j_condition) * np.log((n_class_j_condition) / (len(dataset) * (n_condition / len(y))))
-            confidence = (n_class_j_condition / n_condition)
-            wracc = ((n_condition / len(y)) * ((n_class_j_condition / n_condition) - (len(dataset) / len(y))))
+                resultado_p_valor = sm.duration.survdiff(time=times, status=events, group=group_id)
+                p_value = resultado_p_valor[1]
+                if pd.isna(p_value):
+                    p_value = 1.0
+            except (ValueError, ZeroDivisionError, Exception) as e:
+                p_value = 1.0
+        elif self.comparacao == "complement":
+            try:
+                sg = pd.Series('sub_group', index=indices_group_regra)
+                cpm = pd.Series('complement', index=indices_complemento_regra)
+                group = pd.concat([sg, cpm], axis=0, ignore_index=False).sort_index()
+                #para ter certeza que group e tempos e eventos compartilham os mesmos indices
+                tempos_filtrados = self._surv_times.loc[group.index]
+                eventos_filtrados = self._events.loc[group.index]       
 
-        support = (n_class_j_condition / len(dataset))
-        significance = 2 * sig
+                resultado_p_valor = sm.duration.survdiff(tempos_filtrados, eventos_filtrados, group=group)
+                p_value = resultado_p_valor[1]
+                if pd.isna(p_value):
+                    p_value = 1.0
+            except (ValueError, ZeroDivisionError, Exception) as e:
+                p_value = 1.0
+        alpha = 0.5 # PPARA MAINN
+        suporte_relativo = (len(indices_group_regra)/len(self._all_indices)) 
+        return (1 - p_value) * (suporte_relativo ** alpha)
 
-        return [round(support, 4), round(confidence, 4), round(significance, 4), (round((wracc * 4), 4))]
-
-    def fitness(self, rule, dataset, dataset_by_class, y):
-        metrics = self.get_measures(rule, dataset, dataset_by_class, y)
-        return metrics[3]
-
-    def get_fitness(self, population, dataset, dataset_by_class, y, df):
-        prct_punish = self.coverage_punishment(population, 50, df)
+    def get_fitness(self, population, dataset_x):
         fitness_list = []
-        
         for i in range(len(population)):
-            fitness_list.append(self.fitness(population[i], dataset, dataset_by_class, y))
-        
+            fitness_list.append(self.fitness(population[i], dataset_x))
         fitness_list = np.array(fitness_list)
-        final_fitness = fitness_list - prct_punish
+        return list(fitness_list)       
 
-        return list(final_fitness)
-
-
-    def uncovered_lines_by_class(self, population, dataset):
-        covered_lines_by_class = []
-        for rule in population:
-            for row in range(len(dataset)):
-                tmp_cov = 0
-                for index in range(len(rule[0])):
-                    if type(rule[1][index][0]) == str:
-                        if (len(rule[1][index]) > 1):
-                            if dataset[row][rule[0][index]] in rule[1][index]:
-                                tmp_cov += 1
-                        else:
-                            if dataset[row][rule[0][index]] == rule[1][index][0]:
-                                tmp_cov += 1
-                    else:
-                        if (dataset[row][rule[0][index]] >= rule[1][index][0]) and (dataset[row][rule[0][index]] <= rule[1][index][1]):
-                            tmp_cov += 1
-                if len(rule[0]) == tmp_cov:
-                    covered_lines_by_class.append(row)
-                                    
-        covered_lines = len(pd.unique(covered_lines_by_class))
-        uncovered_lines = len(dataset) - covered_lines
-        return uncovered_lines

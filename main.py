@@ -23,7 +23,8 @@ os.makedirs(base_output, exist_ok=True)
 
 def run_experiment(
         filepath: Path,
-        target_col: int,
+        time_col: str,        
+        event_col: str,
         delimiter : str,
         runs : int,
         header : int | None,
@@ -34,7 +35,8 @@ def run_experiment(
         mutation_rate : float,
         population_size : int, 
         restart_check : int,
-        restart_pct : float
+        restart_pct : float,
+        comparacao: str
 ):
     print(f" --------- Iniciando Experimentos para {dataset_name} ---------")
     try:
@@ -46,48 +48,35 @@ def run_experiment(
         print(f"Erro ao ler o arquivo {e}")
         return
     
-    try: 
-        # se tiver cabeçalho
-        if target_col not in data.columns:
-            if 0 <= target_col < len(data.columns):
-                y_series = data.iloc[:, target_col]
-                x_df = data.drop(data.columns[target_col], axis=1)
-            else:
-                raise IndexError(f"Índice da coluna alvo '{target_col}' está fora do range.")
-        # se não tiver cabeçalho
-        else:
-            y_series = data[target_col]
-            x_df = data.drop(columns=[target_col])
-        X = x_df.values.tolist()
-        Y = y_series.values.ravel().tolist()
-    except ValueError:
-        print("Erro, insira um valor de target column válido")
-    
-    
     nMean, nBest = [],[]
     results_by_times, time, n_rules, rules_size = [],[],[],[]
     output_dir_dataset = os.path.join(base_output, dataset_name)
     os.makedirs(output_dir_dataset, exist_ok=True)
 
+    print(f"Processando Dataset: {dataset_name} ({runs} execuções)...")
+
     for times in range(runs):
-        sd = EASD(X.copy(), Y.copy(), sup_class, crossover_rate, max_generations, mutation_rate, population_size, restart_check, restart_pct, times)
-        results, mean, best, tmp, rules_qnd, info, detailed_rules, mean_size = sd.run()
+        print(f"  Execução {times + 1}/{runs}...")
+        sd = EASD(data.copy(), time_col, event_col, sup_class=sup_class, crossover_rate=crossover_rate, max_generations=max_generations, mutation_rate=mutation_rate, population_size=population_size, restart_check_point=restart_check, restart_percentage=restart_pct, seed_val=times, comparacao=comparacao)
+
+        (results, Mean, best, tmp, rulesQND, 
+         Info, DetailedRules, meanSize) = sd.run()
         
-        n_rules.append(rules_qnd)
-        rules_size.append(mean_size)
+        n_rules.append(rulesQND)
+        rules_size.append(meanSize)
         time.append(round(tmp, 2))
         results_by_times.append(results)
 
         csv_filename_detailed = f"{dataset_name}{times}_DetailedRules.csv"
         csv_path_detailed = os.path.join(output_dir_dataset, csv_filename_detailed)
-        detailed_rules.to_csv(csv_path_detailed, sep=',', index=False)
+        DetailedRules.to_csv(csv_path_detailed, sep=',', index=False)
 
         csv_filename_info = f"{dataset_name}{times}_Info.csv"
         csv_path_detailed_ = os.path.join(output_dir_dataset, csv_filename_info)
-        info.to_csv(csv_path_detailed_, sep=",", index=False)
+        Info.to_csv(csv_path_detailed_, sep=",", index=False)
 
         # Guardar valores intermediários para gerar dados convergência depois
-        for m in mean : nMean.append(m[:400])
+        for m in Mean : nMean.append(m[:400])
         for b in best : nBest.append(b[:400])
 
     nMean = pd.DataFrame(nMean)
@@ -117,10 +106,9 @@ def run_experiment(
     print(f"Resultados salvos em: {output_dir_dataset}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Pegar parâmetros EASD")
+    parser = argparse.ArgumentParser(description="Pegar parâmetros EASD - Modificado")
     parser.add_argument("filepath", type=str, help = "Caminho para o arquivo do dataset - ex: datasets/Mixed/German.csv")
-    parser.add_argument("-t", "--target_col", type=int, help = 'Coluna escolhida como alvo')
-    parser.add_argument("-d", "--delimiter", type = str, default= " ", help = "Padrão utilizado para separar caracteres, ex: espaço ou vírgula")
+    parser.add_argument("-d", "--delimiter", type = str, default= ",", help = "Padrão utilizado para separar caracteres, ex: espaço ou vírgula")
     parser.add_argument("-header", "--header", type=int, default=None, help="Indica o índice do dataset")
     parser.add_argument("-r", "--runs", type=int, default='30', help="Indica o número de vezes que o algoritmo deve ser executado")
     parser.add_argument("-s", "--support", type=float, default=0.5, help="Suporte mínimo de uma classe")
@@ -130,12 +118,15 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--mutation", type=int, default=50, help="Taxa de Mutação")
     parser.add_argument("--restart_check", type=int, default=10, help="Número de gerações sem melhora para melhora")
     parser.add_argument("--restart_pct", type=int, default=10, help="Percentual da população a reiniciar")
-
+    parser.add_argument("-time", "--time_col", required=True, type=str, help="NOME da coluna que contém o Tempo até o Evento (ex: 'tempo_sobrevivencia')")
+    parser.add_argument("-event", "--event_col", required=True, type=str, help="NOME da coluna que contém o Status do Evento (0 ou 1) (ex: 'status_evento')")
+    parser.add_argument("-comp", "--comparacao", type=str, default="complement", choices=['complement', 'population'],help="Grupo de baseline para o teste log-rank (default: complement)")
     args = parser.parse_args()
     dataset_name = Path(args.filepath).stem
     run_experiment(
     filepath=Path(args.filepath),
-        target_col=args.target_col,
+        time_col=args.time_col,
+        event_col=args.event_col,
         dataset_name=dataset_name,
         delimiter=args.delimiter,
         header=args.header,
@@ -146,5 +137,6 @@ if __name__ == "__main__":
         mutation_rate=args.mutation,
         population_size=args.population,
         restart_check=args.restart_check,
-        restart_pct=args.restart_pct
+        restart_pct=args.restart_pct,
+        comparacao=args.comparacao
     )
