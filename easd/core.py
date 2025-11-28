@@ -5,18 +5,33 @@ import random as rd
 import math
 import copy
 import time
-from typing import List, Tuple, Any 
+from typing import List, Tuple, Any
+from heapq import heapify, heappush, heappop
 
 from .results import ResultsFormatter
 from .population import PopulationGenerator
 from .evaluation import RuleEvaluator
 from .operators import GeneticOperators
 
+
 class EASD:
-    def __init__(self, x, y, sup_class, crossover_rate, max_generations, mutation_rate,
-                 population_size, restart_check_point, restart_percentage, seed_val):
+    def __init__(
+        self,
+        x,
+        y,
+        ksize,
+        sup_class,
+        crossover_rate,
+        max_generations,
+        mutation_rate,
+        population_size,
+        restart_check_point,
+        restart_percentage,
+        seed_val,
+    ):
         self.x = x
         self.y = y
+        self.ksize = ksize
         self.sup_class = sup_class
         self.crossover_rate = crossover_rate
         self.max_generations = max_generations
@@ -25,14 +40,17 @@ class EASD:
         self.restart_check_point = restart_check_point
         self.restart_percentage = restart_percentage
         self.seed = seed_val
-        
+
+        self.top_k_heap = []
+        self.best_by_key = {}
+        heapify(self.top_k_heap)
+
         self.formatter = ResultsFormatter(self)
         self.generator = PopulationGenerator()
         self.evaluation = RuleEvaluator()
         self.operators = GeneticOperators(self.evaluation, self.get_best)
-        
-        seed(self.seed)
 
+        seed(self.seed)
 
     def clean_and_convert(self, x_data):
         dfx = pd.DataFrame(x_data)
@@ -43,13 +61,13 @@ class EASD:
 
     def get_classes(self, x_data, y_data):
         dataset_by_class = []
-        classes = pd.Series(y_data).unique
+        classes = pd.Series(y_data).unique()
         for label in range(len(classes)):
             label_spot = []
             dataset_by_class.append(label_spot)
         for i in range(len(classes)):
             for j in range(len(y_data)):
-                if y_data[j] == classes[i]:				
+                if y_data[j] == classes[i]:
                     dataset_by_class[i].append(x_data[j])
         return dataset_by_class, classes.tolist()
 
@@ -70,19 +88,19 @@ class EASD:
                 if rule[1][i][1] > max_val:
                     rule[1][i][1] = max_val
                     c_max = False
-                    
+
                 int_max_val = rule[1][i][1]
                 idx = rule[0][i]
-                
-                if c_max:				
+
+                if c_max:
                     to_max_ordered = df[idx].apply(lambda x: abs(x - int_max_val)).sort_values()
                     indexes = to_max_ordered.index[:1]
                     rule[1][i][1] = df[idx].loc[indexes[0]]
-                    
+
                 if c_min:
                     int_min_val = rule[1][i][0]
                     to_min_ordered = df[idx].apply(lambda x: abs(x - int_min_val)).sort_values()
-                    indexes = to_min_ordered.index[:len(to_min_ordered)]
+                    indexes = to_min_ordered.index[: len(to_min_ordered)]
                     for j in range(len(to_min_ordered)):
                         new_min = df[idx].loc[indexes[j]]
                         if new_min < int_max_val:
@@ -95,7 +113,7 @@ class EASD:
 
     def check_stop(self, check_num, current_fit, max_times, fit_history):
         restart_param = False
-        
+
         if len(fit_history) == 0:
             fit_history.append(current_fit)
             last_added = len(fit_history) - 1
@@ -116,7 +134,7 @@ class EASD:
             check_num = 0
             fit_history = []
             restart_param = True
-            
+
         return fit_history, check_num, restart_param
 
     def get_top_k(self, k, fitness_list):
@@ -135,7 +153,7 @@ class EASD:
         replacement_qtd = int(math.ceil(len(population) * restart_prct))
         remain_index = self.get_top_k((len(population) - replacement_qtd), fitness_list)
         pop = self.generator.gen_population(replacement_qtd, dataset)
-        
+
         for i in range(len(remain_index)):
             new_population.append(population[remain_index[i]])
         for i in range(len(pop)):
@@ -151,7 +169,7 @@ class EASD:
         mean_fitness_history = []
         best_fitness_history = []
         df_full = pd.DataFrame(self.x)
-        
+
         check_times = int(self.max_generations * (self.restart_check_point / 100))
 
         for i in range(len(labels)):
@@ -160,7 +178,7 @@ class EASD:
         for cls_idx, specific_class_dataset in enumerate(dataset_by_class):
             print(f"\n--- Processando Classe: {labels[cls_idx]} ({len(specific_class_dataset)} exemplos) ---")
             rules_found_this_class = []
-            
+
             uncovered_lines_count = len(specific_class_dataset)
             min_support_count = int(self.sup_class * len(specific_class_dataset))
 
@@ -173,19 +191,31 @@ class EASD:
                 gen_mean_fitness, gen_best_fitness = [], []
 
                 while gen_count < self.max_generations:
-                    fitness_list = self.evaluation.get_fitness(population, specific_class_dataset, dataset_by_class, self.y, df_full)
-                    
-                    population, fitness_list = self.operators.crossover(population, (self.crossover_rate / 100), 
-                                                                       fitness_list, specific_class_dataset, 
-                                                                       dataset_by_class, self.y, df_full)
+                    fitness_list = self.evaluation.get_fitness(
+                        population, specific_class_dataset, dataset_by_class, self.y, df_full
+                    )
 
-                    print(f'    gen {gen_count}')
+                    population, fitness_list = self.operators.crossover(
+                        population,
+                        (self.crossover_rate / 100),
+                        fitness_list,
+                        specific_class_dataset,
+                        dataset_by_class,
+                        self.y,
+                        df_full,
+                    )
 
-                    population = self.operators.mutation(population, (self.mutation_rate / 100), 
-                                                        fitness_list, specific_class_dataset)
+                    print(f"    gen {gen_count}")
 
-                    fitness_list = self.evaluation.get_fitness(population, specific_class_dataset, 
-                                                              dataset_by_class, self.y, df_full)
+                    population = self.operators.mutation(
+                        population, (self.mutation_rate / 100), fitness_list, specific_class_dataset
+                    )
+
+                    fitness_list = self.evaluation.get_fitness(
+                        population, specific_class_dataset, dataset_by_class, self.y, df_full
+                    )
+
+                    self._update_top_k(population, fitness_list)
 
                     if fitness_list:
                         mean_fit = np.mean(fitness_list)
@@ -198,14 +228,16 @@ class EASD:
                         break
 
                     fitness_history, check_counter, trigger_restart = self.check_stop(
-                        check_counter, current_fitness, check_times, fitness_history)
+                        check_counter, current_fitness, check_times, fitness_history
+                    )
 
                     gen_count += 1
 
                     if trigger_restart and restart_counter < 7:
                         print("    -> Reiniciando população...")
-                        population = self.population_restart(population, fitness_list, 
-                                                           (self.restart_percentage / 100), specific_class_dataset)
+                        population = self.population_restart(
+                            population, fitness_list, (self.restart_percentage / 100), specific_class_dataset
+                        )
                         check_counter = 0
                         restart_counter += 1
                     elif trigger_restart and gen_count >= int(self.max_generations * 0.8) and restart_counter >= 7:
@@ -225,14 +257,20 @@ class EASD:
                     else:
                         print("AVISO: Não foi possível determinar a melhor regra.")
 
-                    uncovered_lines_count = self.evaluation.uncovered_lines_by_class(rules_found_this_class, specific_class_dataset)
-                    print(f'  Regra encontrada. Run number: {len(rules_found_this_class)}')
-                    print(f'  Linhas não cobertas restantes: {uncovered_lines_count} (Suporte Mínimo: {min_support_count})')
+                    uncovered_lines_count = self.evaluation.uncovered_lines_by_class(
+                        rules_found_this_class, specific_class_dataset
+                    )
+                    print(f"  Regra encontrada. Run number: {len(rules_found_this_class)}")
+                    print(
+                        f"  Linhas não cobertas restantes: {uncovered_lines_count} (Suporte Mínimo: {min_support_count})"
+                    )
                 else:
                     print("AVISO: Evolução terminou sem população/fitness válidos. Nenhuma regra adicionada.")
                     uncovered_lines_count = 0
 
-            print(f'  -> Finalizou Classe {labels[cls_idx]}. Total de regras: {len(rules_found_this_class)}. Linhas não cobertas: {uncovered_lines_count}')
+            print(
+                f"  -> Finalizou Classe {labels[cls_idx]}. Total de regras: {len(rules_found_this_class)}. Linhas não cobertas: {uncovered_lines_count}"
+            )
 
         final_measures = []
         for i in range(len(dataset_by_class)):
@@ -240,9 +278,9 @@ class EASD:
 
         for cls_idx in range(len(dataset_by_class)):
             for rule_idx in range(len(rules[cls_idx])):
-                rule_metrics = self.evaluation.get_measures(rules[cls_idx][rule_idx], 
-                                                          dataset_by_class[cls_idx], 
-                                                          dataset_by_class, self.y)
+                rule_metrics = self.evaluation.get_measures(
+                    rules[cls_idx][rule_idx], dataset_by_class[cls_idx], dataset_by_class, self.y
+                )
                 final_measures[cls_idx].append(rule_metrics)
 
         detailed_rules_df = self.formatter.give_rules_details(final_measures, labels, rules)
@@ -265,6 +303,51 @@ class EASD:
         mean_size = np.mean(rules_size, axis=0) if rules_size else 0
         print(final_result)
 
-        total_time = (time.time() - start_time)
-        
-        return [final_result], mean_fitness_history, best_fitness_history, total_time, rules_qtd, info_df, detailed_rules_df, mean_size
+        total_time = time.time() - start_time
+
+        return (
+            [final_result],
+            mean_fitness_history,
+            best_fitness_history,
+            total_time,
+            rules_qtd,
+            info_df,
+            detailed_rules_df,
+            mean_size,
+        )
+
+    def _update_top_k(self, p_population, p_fitness_list):
+        for individual, fitness in zip(p_population, p_fitness_list):
+            key = self._rule_key(individual)
+
+            previous = self.best_by_key.get(key)
+            if previous is not None:
+                self._update_current_rule(key, previous, individual, fitness)
+
+            else:
+                if len(self.best_by_key) < self.ksize:
+                    self._add_rule_to_top_k(key, fitness, individual)
+                else:
+                    if fitness > self.top_k_heap[0][0]:
+                        self._add_rule_to_top_k(key, fitness, individual)
+
+                        while len(self.best_by_key) > self.ksize:
+                            worst_fit, worst_key = heappop(self.top_k_heap)
+
+                            current = self.best_by_key.get(worst_key)
+                            if current is not None and current[0] == worst_fit:
+                                del self.best_by_key[worst_key]
+
+    def _update_current_rule(self, p_rule, p_previous, p_individual, p_fitness):
+        previous_fit, _ = p_previous
+        if p_fitness > previous_fit:
+            self._add_rule_to_top_k(p_rule, p_fitness, p_individual)
+            self.top_k_heap.remove((previous_fit, p_rule))
+
+    def _add_rule_to_top_k(self, p_rule, p_fitness, p_individual):
+        self.best_by_key[p_rule] = (p_fitness, p_individual)
+        heappush(self.top_k_heap, (p_fitness, p_rule))
+
+    def _rule_key(self, p_individual):
+        # se a ordem dos atributos não importar, use tuple(sorted(...))
+        return tuple(sorted(p_individual[0]))
