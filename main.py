@@ -1,11 +1,12 @@
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')
+
+matplotlib.use("Agg")
 import pandas as pd
 import os
 import sys
 import argparse
-from pathlib import Path 
+from pathlib import Path
 
 dir_path = os.path.dirname(__file__)
 if dir_path not in sys.path:
@@ -22,31 +23,32 @@ os.makedirs(base_output, exist_ok=True)
 
 
 def run_experiment(
-        filepath: Path,
-        target_col: int,
-        delimiter : str,
-        runs : int,
-        header : int | None,
-        dataset_name : str,
-        sup_class : float,
-        crossover_rate : int, 
-        max_generations : int,
-        mutation_rate : float,
-        population_size : int, 
-        restart_check : int,
-        restart_pct : float
+    filepath: Path,
+    target_col: int,
+    delimiter: str,
+    runs: int,
+    header: int | None,
+    dataset_name: str,
+    k_size: int,
+    sup_class: float,
+    crossover_rate: int,
+    max_generations: int,
+    mutation_rate: float,
+    population_size: int,
+    restart_check: int,
+    restart_pct: float,
 ):
     print(f" --------- Iniciando Experimentos para {dataset_name} ---------")
     try:
-        data = pd.read_csv(filepath, delimiter=delimiter, header=header, engine='python')
+        data = pd.read_csv(filepath, delimiter=delimiter, header=header, engine="python")
     except FileNotFoundError:
         print(f"Erro: Arquivo não encontrado em {filepath}")
         return
     except Exception as e:
         print(f"Erro ao ler o arquivo {e}")
         return
-    
-    try: 
+
+    try:
         # se tiver cabeçalho
         if target_col not in data.columns:
             if 0 <= target_col < len(data.columns):
@@ -62,17 +64,28 @@ def run_experiment(
         Y = y_series.values.ravel().tolist()
     except ValueError:
         print("Erro, insira um valor de target column válido")
-    
-    
-    nMean, nBest = [],[]
-    results_by_times, time, n_rules, rules_size = [],[],[],[]
+
+    nMean, nBest = [], []
+    results_by_times, time, n_rules, rules_size = [], [], [], []
     output_dir_dataset = os.path.join(base_output, dataset_name)
     os.makedirs(output_dir_dataset, exist_ok=True)
 
     for times in range(runs):
-        sd = EASD(X.copy(), Y.copy(), sup_class, crossover_rate, max_generations, mutation_rate, population_size, restart_check, restart_pct, times)
-        results, mean, best, tmp, rules_qnd, info, detailed_rules, mean_size = sd.run()
-        
+        sd = EASD(
+            X.copy(),
+            Y.copy(),
+            k_size,
+            sup_class,
+            crossover_rate,
+            max_generations,
+            mutation_rate,
+            population_size,
+            restart_check,
+            restart_pct,
+            times,
+        )
+        top_k, results, mean, best, tmp, rules_qnd, info, detailed_rules, mean_size = sd.run()
+
         n_rules.append(rules_qnd)
         rules_size.append(mean_size)
         time.append(round(tmp, 2))
@@ -80,19 +93,21 @@ def run_experiment(
 
         csv_filename_detailed = f"{dataset_name}{times}_DetailedRules.csv"
         csv_path_detailed = os.path.join(output_dir_dataset, csv_filename_detailed)
-        detailed_rules.to_csv(csv_path_detailed, sep=',', index=False)
+        detailed_rules.to_csv(csv_path_detailed, sep=",", index=False)
 
         csv_filename_info = f"{dataset_name}{times}_Info.csv"
         csv_path_detailed_ = os.path.join(output_dir_dataset, csv_filename_info)
         info.to_csv(csv_path_detailed_, sep=",", index=False)
 
         # Guardar valores intermediários para gerar dados convergência depois
-        for m in mean : nMean.append(m[:400])
-        for b in best : nBest.append(b[:400])
+        for m in mean:
+            nMean.append(m[:400])
+        for b in best:
+            nBest.append(b[:400])
 
     nMean = pd.DataFrame(nMean)
     nMean = nMean.T
-    csv_name =  f"{dataset_name}{times}_mean_evolution.csv"
+    csv_name = f"{dataset_name}{times}_mean_evolution.csv"
     nMean.to_csv(csv_name, sep=",", index=False)
 
     nBest = pd.DataFrame(nBest)
@@ -102,7 +117,7 @@ def run_experiment(
 
     txt_filename = f"{dataset_name}_FinalResult.txt"
     txt_path = os.path.join(output_dir_dataset, txt_filename)
-    with open(txt_path, 'w') as file:
+    with open(txt_path, "w") as file:
         mean_results = np.mean(results_by_times, axis=0) if results_by_times else []
         std_results = np.std(results_by_times, axis=0) if results_by_times else []
         mean_time = round(np.mean(time), 2) if time else 0
@@ -116,13 +131,28 @@ def run_experiment(
     print(f"--- Experimento para {dataset_name} CONCLUÍDO ---")
     print(f"Resultados salvos em: {output_dir_dataset}")
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pegar parâmetros EASD")
-    parser.add_argument("filepath", type=str, help = "Caminho para o arquivo do dataset - ex: datasets/Mixed/German.csv")
-    parser.add_argument("-t", "--target_col", type=int, help = 'Coluna escolhida como alvo')
-    parser.add_argument("-d", "--delimiter", type = str, default= " ", help = "Padrão utilizado para separar caracteres, ex: espaço ou vírgula")
+    parser.add_argument(
+        "-f",
+        "--filepath",
+        type=str,
+        help="Caminho para o arquivo do dataset - ex: datasets/Mixed/German.csv",
+    )
+    parser.add_argument("-t", "--target_col", type=int, help="Coluna escolhida como alvo", default=4)
+    parser.add_argument(
+        "-d",
+        "--delimiter",
+        type=str,
+        default=",",
+        help="Padrão utilizado para separar caracteres, ex: espaço ou vírgula",
+    )
     parser.add_argument("-header", "--header", type=int, default=None, help="Indica o índice do dataset")
-    parser.add_argument("-r", "--runs", type=int, default='30', help="Indica o número de vezes que o algoritmo deve ser executado")
+    parser.add_argument(
+        "-r", "--runs", type=int, default="30", help="Indica o número de vezes que o algoritmo deve ser executado"
+    )
+    parser.add_argument("-k", "--ksize", type=float, default=10, help="Tamanho do rank de Top-K regras")
     parser.add_argument("-s", "--support", type=float, default=0.5, help="Suporte mínimo de uma classe")
     parser.add_argument("-c", "--crossover", type=float, default=50, help="Taxa de crossover")
     parser.add_argument("-g", "--generations", type=int, default=500, help="Número máximo de gerações")
@@ -134,17 +164,18 @@ if __name__ == "__main__":
     args = parser.parse_args()
     dataset_name = Path(args.filepath).stem
     run_experiment(
-    filepath=Path(args.filepath),
+        filepath=Path(args.filepath),
         target_col=args.target_col,
         dataset_name=dataset_name,
         delimiter=args.delimiter,
         header=args.header,
         runs=args.runs,
+        k_size=args.ksize,
         sup_class=args.support,
         crossover_rate=args.crossover,
         max_generations=args.generations,
         mutation_rate=args.mutation,
         population_size=args.population,
         restart_check=args.restart_check,
-        restart_pct=args.restart_pct
+        restart_pct=args.restart_pct,
     )
