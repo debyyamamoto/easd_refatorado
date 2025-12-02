@@ -84,7 +84,7 @@ def run_experiment(
             restart_pct,
             times,
         )
-        results, mean, best, tmp, rules_qnd, info, detailed_rules, mean_size = sd.run()
+        top_k, results, mean, best, tmp, rules_qnd, info, detailed_rules, mean_size = sd.run()
 
         n_rules.append(rules_qnd)
         rules_size.append(mean_size)
@@ -139,7 +139,6 @@ if __name__ == "__main__":
         "--filepath",
         type=str,
         help="Caminho para o arquivo do dataset - ex: datasets/Mixed/German.csv",
-        default="C:/GitHub/easd_refatorado/easd_refatorado/datasets/Numeric/iris.txt",
     )
     parser.add_argument("-t", "--target_col", type=int, help="Coluna escolhida como alvo", default=4)
     parser.add_argument(

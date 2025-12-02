@@ -306,6 +306,7 @@ class EASD:
         total_time = time.time() - start_time
 
         return (
+            pd.DataFrame(self.best_by_key),
             [final_result],
             mean_fitness_history,
             best_fitness_history,
