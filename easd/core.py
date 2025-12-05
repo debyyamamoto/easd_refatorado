@@ -7,14 +7,13 @@ import copy
 import time
 from typing import List, Tuple, Any 
 
-from .results import ResultsFormatter
 from .population import PopulationGenerator
 from .evaluation import RuleEvaluator
 from .operators import GeneticOperators
 from .dataset import Dataset
 class EASD:
     def __init__(self, data : pd.DataFrame, time_col:str, event_col:str, sup_class, crossover_rate, max_generations, mutation_rate,
-                 population_size, restart_check_point, restart_percentage, seed_val, comparacao:str):
+                 population_size, restart_check_point, restart_percentage, seed_val, comparacao:str, alpha, executions):
         self.sup_class = sup_class
         self.crossover_rate = crossover_rate
         self.max_generations = max_generations
@@ -25,11 +24,10 @@ class EASD:
         self.seed = seed_val
         
         self.dataset_obj = Dataset(data, time_col, event_col)
-        self.formatter = ResultsFormatter(self)
         self.generator = PopulationGenerator()
-        self.evaluation = RuleEvaluator(self.dataset_obj, comparacao)
+        self.evaluation = RuleEvaluator(self.dataset_obj, comparacao, alpha)
         self.operators = GeneticOperators(self.evaluation, self.get_best)
-    
+        self.executions = executions
         seed(self.seed)
 
     def adjust_interval(self, rule, dataset):
@@ -145,6 +143,7 @@ class EASD:
             population = self.generator.gen_population(self.population_size, dataset_x)
             gen_mean_fitness, gen_best_fitness = [], []
 
+            
             while gen_count < self.max_generations:
                 fitness_list = self.evaluation.get_fitness(population, dataset_x)
                 

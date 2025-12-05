@@ -40,7 +40,7 @@ class RuleEvaluator:
                 mask &= row_mask
         return np.where(mask)[0].tolist()
 
-    def fitness(self, rule, dataset_x):
+    def fitness(self, rule, dataset_x, alpha):
         "Recebe uma regra e calcula o seu fitness"
         # Pensar em como adaptar para uma regra só 
         # separar o grupo que possui uma determinada regra e comparar com o basegroup escolhido 
@@ -84,7 +84,6 @@ class RuleEvaluator:
                     p_value = 1.0
             except (ValueError, ZeroDivisionError, Exception) as e:
                 p_value = 1.0
-        alpha = 0.5 # PPARA MAINN
         suporte_relativo = (len(indices_group_regra)/len(self._all_indices)) 
         return (1 - p_value) * (suporte_relativo ** alpha)
 

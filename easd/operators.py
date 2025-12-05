@@ -9,33 +9,44 @@ class GeneticOperators:
         self._get_best = get_best_func
 
     def to_mutate_continuous(self, interval, usage_prct, mutation_option):
+        """
+        Função que faz a mutação de atributos numéricos
+        """
         new_interval = []
         amplitude = (interval[1] - interval[0]) * usage_prct
-        
+        # aumentar ambos os limites
         if mutation_option == 1:
             new_interval.append(interval[0] + amplitude)
             new_interval.append(interval[1] + amplitude)
+        # diminuir ambos os limites
         elif mutation_option == 2:
             new_interval.append(interval[0] - amplitude)
             new_interval.append(interval[1] - amplitude)
+        # aumentar o limite à direita e diminuir o da esquerda 
         elif mutation_option == 3:
             new_interval.append(interval[0] - amplitude)
             new_interval.append(interval[1] + amplitude)
+        # aumentar o limite à esquerda e diminuir o da direita
         elif mutation_option == 4:
             new_interval.append(interval[0] + amplitude)
             new_interval.append(interval[1] - amplitude)
+        # aumenta o da esquerda
         elif mutation_option == 5:
             new_interval.append(interval[0] + amplitude)
             new_interval.append(interval[1])
+        # aumentar o da direita
         elif mutation_option == 6:
             new_interval.append(interval[0])
             new_interval.append(interval[1] + amplitude)
+        # diminuir o da esquerda
         elif mutation_option == 7:
             new_interval.append(interval[0] - amplitude)
             new_interval.append(interval[1])
+        # diminuir o da direita
         elif mutation_option == 8:
             new_interval.append(interval[0])
             new_interval.append(interval[1] - amplitude)
+        # remover o atributo da regra 
         elif mutation_option == 9:
             new_interval = []
             
@@ -43,8 +54,10 @@ class GeneticOperators:
 
     def to_mutate_discrete(self, discrete_atr, attribute_domain, mutation_option):
         new_discrete = []
-        
-        
+        """
+        Função que faz a mutação de atributos categóricos
+        """        
+        # 2artigo - adição de um valor aleatório à lista de valores aceitos para aquele atributo
         if mutation_option == 1:
             for i in range(len(discrete_atr)):
                 new_discrete.append(discrete_atr[i])
@@ -56,6 +69,7 @@ class GeneticOperators:
                     if to_add not in new_discrete:
                         new_discrete.append(to_add)
                         break
+        # 3artigo - troca um dos valores atuais por um outro valor diferente disponível no domínio
         elif mutation_option == 3:
             if len(discrete_atr) > 1:
                 rd_index = rd.randint(0, len(discrete_atr) - 1)
@@ -63,6 +77,7 @@ class GeneticOperators:
                 new_discrete = discrete_atr[:]
             elif len(discrete_atr) == 1:
                 new_discrete = []
+        # 1artigo - Remove um valor da lista de valores aceitos.
         elif mutation_option == 2:
             if len(discrete_atr) > 1:
                 to_be_altered = rd.randint(0, len(discrete_atr) - 1)
@@ -90,10 +105,12 @@ class GeneticOperators:
                         mutated_population.remove(rule)
                     else:
                         break
-                
+                # elitismo - proteção do melhor individuo 
                 if rd_index != self._get_best(mutated_population, fitness_list):
+                    # se a regra tiver só um atributo -> ele vai ser alterado 
                     if len(rule[0]) == 1:
                         atr_qtd = 1
+                    # caso contrário, a quantidade é sorteada
                     else:
                         atr_qtd = rd.randint(1, len(rule[0]))
                     
@@ -106,6 +123,7 @@ class GeneticOperators:
                                 break
                     
                     cnt = 0
+                    # escolhe o tipo de mutação conforme
                     size_check = len(rule[0])
                     while cnt < len(selected_for_mutation):
                         if size_check > 1:
@@ -150,14 +168,15 @@ class GeneticOperators:
         return mutated_population
 
     def crossover1(self, parent1, parent2):
-        parent1_col = copy.deepcopy(parent1[0])
-        parent2_col = copy.deepcopy(parent2[0])
-
+        parent1_col = parent1[0]
+        parent2_col = parent2[0]
+        # condição 1, condição 1 e caso 2, condição 1 - junção dos pais
         if parent1_col[0] not in parent2_col:
-            offspring = parent2
+            offspring = copy.deepcopy(parent2)
             offspring[0].append(parent1[0][0])
             offspring[1].append(parent1[1][0])
             return offspring
+        # caso 1, condição 2 - o valor do pai menor substitui o valor de atributo do segundo pai
         else:
             if type(parent1[1][0][0]) == str:
                 offspring = parent2
@@ -171,6 +190,9 @@ class GeneticOperators:
         return offspring
 
     def single_point_crossover(self, parent1, parent2):
+        """
+        retornam dois novos individuos a partir da mistura dos pais, sem repetição de atributos
+        """
         offspring1, offspring2 = [[], []], [[], []]
 
         if len(parent1[0]) < len(parent2[0]):
@@ -260,19 +282,24 @@ class GeneticOperators:
                         break
                 
                 parents_index = [p1, p2]
+                # seleciona dois pais 
                 parent1 = copy.deepcopy(population[p1])
                 parent2 = copy.deepcopy(population[p2])
-                
+                # verifica se ambos os pais tem tamanho maior que 1
                 if min(len(parent1[0]), len(parent2[0])) > 1:
                     offspring1, offspring2 = self.single_point_crossover(parent1, parent2)
                     population, fitness_list = self.check_subst(population, dataset_x, parents_index, [offspring1, offspring2], fitness_list, df_full)
+                # verifica se pelo menos um dos pais tem tamanho 1 
                 else:
+                    # ambos tem tamanho igual a 1 e tem os mesmo atributos
                     if (len(parent1[0]) == len(parent2[0])) and (parent1[0] == parent2[0]):
                         pass
                     else:
+                        # se o pai 1 tem tamanho == 1
                         if len(parent1[0]) == 1:
                             offspring = self.crossover1(parent1, parent2)
                             population, fitness_list = self.check_subst(population, dataset_x, parents_index, [offspring], fitness_list, df_full)
+                        # se pai 2 tem tamanho igual a 1
                         else:
                             offspring = self.crossover1(parent2, parent1)
                             population, fitness_list = self.check_subst(population, dataset_x, parents_index, [offspring], fitness_list, df_full)

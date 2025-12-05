@@ -36,7 +36,9 @@ def run_experiment(
         population_size : int, 
         restart_check : int,
         restart_pct : float,
-        comparacao: str
+        comparacao: str,
+        alpha : float,
+        executions : int 
 ):
     print(f" --------- Iniciando Experimentos para {dataset_name} ---------")
     try:
@@ -57,7 +59,7 @@ def run_experiment(
 
     for times in range(runs):
         print(f"  Execução {times + 1}/{runs}...")
-        sd = EASD(data.copy(), time_col, event_col, sup_class=sup_class, crossover_rate=crossover_rate, max_generations=max_generations, mutation_rate=mutation_rate, population_size=population_size, restart_check_point=restart_check, restart_percentage=restart_pct, seed_val=times, comparacao=comparacao)
+        sd = EASD(data.copy(), time_col, event_col, sup_class=sup_class, crossover_rate=crossover_rate, max_generations=max_generations, mutation_rate=mutation_rate, population_size=population_size, restart_check_point=restart_check, restart_percentage=restart_pct, seed_val=times, comparacao=comparacao, alpha=alpha)
 
         (results, Mean, best, tmp, rulesQND, 
          Info, DetailedRules, meanSize) = sd.run()
@@ -121,6 +123,8 @@ if __name__ == "__main__":
     parser.add_argument("-time", "--time_col", required=True, type=str, help="NOME da coluna que contém o Tempo até o Evento (ex: 'tempo_sobrevivencia')")
     parser.add_argument("-event", "--event_col", required=True, type=str, help="NOME da coluna que contém o Status do Evento (0 ou 1) (ex: 'status_evento')")
     parser.add_argument("-comp", "--comparacao", type=str, default="complement", choices=['complement', 'population'],help="Grupo de baseline para o teste log-rank (default: complement)")
+    parser.add_argument("-a", "--alpha", type=float, default=0.5, help="Peso Alpha para o Fitness (Default: 0.5)")
+    parser.add_argument("-exe", "--executions", type=int, default=1000, help="Número de execuções do algoritmo")
     args = parser.parse_args()
     dataset_name = Path(args.filepath).stem
     run_experiment(
@@ -138,5 +142,7 @@ if __name__ == "__main__":
         population_size=args.population,
         restart_check=args.restart_check,
         restart_pct=args.restart_pct,
-        comparacao=args.comparacao
+        comparacao=args.comparacao,
+        alpha=args.alpha,
+        executions=args.executions
     )
