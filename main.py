@@ -1,13 +1,15 @@
-import numpy as np
-import matplotlib
-
-matplotlib.use("Agg")
-import pandas as pd
-import os
-import sys
 import argparse
-from pathlib import Path
+import matplotlib
+import numpy as np
+import os
+import pandas as pd
+from pathlib import Path 
+import sys
 
+# Anti-Grain Geometry, trava pop-ups 
+matplotlib.use('Agg')
+
+# Adiciona o diretório atual ao path para garantir que imports funcionem 
 dir_path = os.path.dirname(__file__)
 if dir_path not in sys.path:
     sys.path.append(dir_path)
@@ -21,103 +23,108 @@ except ImportError as e:
 base_output = os.path.join(os.path.dirname(__file__), "results")
 os.makedirs(base_output, exist_ok=True)
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="EASD")
+    # Argumentos Obrigatórios 
+    parser.add_argument("filepath", type=str, help = "Caminho para o arquivo do dataset - ex: datasets/Mixed/German.csv")
+    parser.add_argument("-time", "--time_col", required=True, type=str, help="NOME da coluna que contém o Tempo até o Evento (ex: 'tempo_sobrevivencia')")
+    parser.add_argument("-event", "--event_col", required=True, type=str, help="NOME da coluna que contém o Status do Evento (0 ou 1) (ex: 'status_evento')")
+    
+    # Argumentos Opcionais (com Defaults)
+    parser.add_argument("-d", "--delimiter", type = str, default= ",", help = "Padrão utilizado para separar caracteres, ex: espaço ou vírgula")
+    parser.add_argument("-header", "--header", type=int, default=0, help="Indica o índice do dataset")
+    parser.add_argument("-c", "--crossover", type=float, default=50, help="Taxa de crossover")
+    parser.add_argument("-g", "--generations", type=int, default=500, help="Número máximo de gerações")
+    parser.add_argument("-p", "--population", type=int, default=500, help="Tamanho da População")
+    parser.add_argument("-m", "--mutation", type=int, default=50, help="Taxa de Mutação")
+    parser.add_argument("--restart_check", type=int, default=10, help="Número de gerações sem melhora para melhora")
+    parser.add_argument("--restart_pct", type=int, default=10, help="Percentual da população a reiniciar")
+    parser.add_argument("-comp", "--comparacao", type=str, default="complement", choices=['complement', 'population'],help="Grupo de baseline para o teste log-rank (default: complement)")
+    parser.add_argument("-a", "--alpha", type=float, default=0.5, help="Peso Alpha para o Fitness (Default: 0.5)")
+    parser.add_argument("-exe", "--executions", type=int, default=1000, help="Número de execuções do algoritmo")
+    parser.add_argument("-k", "--ksize", type=float, default=10, help="Tamanho do rank de Top-K regras")
+    parser.add_argument("--seed", type=int, default=42, help="Semente para reprodutibilidade")
+    parser.add_argument("-id", "--run_id", type=int, default=0, help="ID da execução para nomear arquivos")
 
-def run_experiment(
-    filepath: Path,
-    target_col: int,
-    delimiter: str,
-    runs: int,
-    header: int | None,
-    dataset_name: str,
-    k_size: int,
-    sup_class: float,
-    crossover_rate: int,
-    max_generations: int,
-    mutation_rate: float,
-    population_size: int,
-    restart_check: int,
-    restart_pct: float,
-):
-    print(f" --------- Iniciando Experimentos para {dataset_name} ---------")
+    args = parser.parse_args()
+    dataset_name = Path(args.filepath).stem
+
     try:
-        data = pd.read_csv(filepath, delimiter=delimiter, header=header, engine="python")
+        data = pd.read_csv(
+            args.filepath, 
+            delimiter=args.delimiter, 
+            header=args.header, 
+            engine='python'
+            )
     except FileNotFoundError:
         print(f"Erro: Arquivo não encontrado em {filepath}")
-        return
+        sys.exit(1)
     except Exception as e:
         print(f"Erro ao ler o arquivo {e}")
-        return
+        sys.exit(1)
 
-    try:
-        # se tiver cabeçalho
-        if target_col not in data.columns:
-            if 0 <= target_col < len(data.columns):
-                y_series = data.iloc[:, target_col]
-                x_df = data.drop(data.columns[target_col], axis=1)
-            else:
-                raise IndexError(f"Índice da coluna alvo '{target_col}' está fora do range.")
-        # se não tiver cabeçalho
-        else:
-            y_series = data[target_col]
-            x_df = data.drop(columns=[target_col])
-        X = x_df.values.tolist()
-        Y = y_series.values.ravel().tolist()
-    except ValueError:
-        print("Erro, insira um valor de target column válido")
+    nMean, nBest = [],[]
+    results_by_times, time, n_rules, rules_size = [],[],[],[]
 
-    nMean, nBest = [], []
-    results_by_times, time, n_rules, rules_size = [], [], [], []
     output_dir_dataset = os.path.join(base_output, dataset_name)
     os.makedirs(output_dir_dataset, exist_ok=True)
 
-    for times in range(runs):
-        sd = EASD(
-            X.copy(),
-            Y.copy(),
-            k_size,
-            sup_class,
-            crossover_rate,
-            max_generations,
-            mutation_rate,
-            population_size,
-            restart_check,
-            restart_pct,
-            times,
+    print(f"Processando Dataset: {dataset_name} ({args.executions} execuções)...")
+
+    sd = EASD(
+        data.copy(), 
+        args.time_col, 
+        args.event_col,
+        crossover_rate=args.crossover, 
+        max_generations=args.generations, 
+        mutation_rate=args.mutation, 
+        population_size=args.population, 
+        restart_check_point=args.restart_check, 
+        restart_percentage=args.restart_pct, 
+        seed_val=args.seed, 
+        comparacao=args.comparacao, 
+        alpha=args.alpha, 
+        executions=args.executions, 
+        ksize = args.ksize
         )
-        top_k, results, mean, best, tmp, rules_qnd, info, detailed_rules, mean_size = sd.run()
 
-        n_rules.append(rules_qnd)
-        rules_size.append(mean_size)
-        time.append(round(tmp, 2))
-        results_by_times.append(results)
+    # Executa
+    print(f"--- Rodando dataset {dataset_name} (ID: {args.run_id}) ---")
+    (results, Mean, best, tmp, rulesQND, 
+        Info, DetailedRules, meanSize) = sd.run()
+    
+    # Coleta Métricas
+    n_rules.append(rulesQND)
+    rules_size.append(meanSize)
+    time.append(round(tmp, 2))
+    results_by_times.append(results)
 
-        csv_filename_detailed = f"{dataset_name}{times}_DetailedRules.csv"
-        csv_path_detailed = os.path.join(output_dir_dataset, csv_filename_detailed)
-        detailed_rules.to_csv(csv_path_detailed, sep=",", index=False)
+    # Salva CSVs da execução atual 
+    csv_filename_detailed = f"{dataset_name}_{args.run_id}_DetailedRules.csv"
+    csv_path_detailed = os.path.join(output_dir_dataset, csv_filename_detailed)
+    DetailedRules.to_csv(csv_path_detailed, sep=',', index=False)
 
-        csv_filename_info = f"{dataset_name}{times}_Info.csv"
-        csv_path_detailed_ = os.path.join(output_dir_dataset, csv_filename_info)
-        info.to_csv(csv_path_detailed_, sep=",", index=False)
+    csv_filename_info = f"{dataset_name}_{args.run_id}_Info.csv"
+    csv_path_info = os.path.join(output_dir_dataset, csv_filename_info)
+    Info.to_csv(csv_path_info, sep=",", index=False)
 
-        # Guardar valores intermediários para gerar dados convergência depois
-        for m in mean:
-            nMean.append(m[:400])
-        for b in best:
-            nBest.append(b[:400])
+    # Guardar valores intermediários para gerar dados convergência depois
+    for m in Mean : nMean.append(m[:400])
+    for b in best : nBest.append(b[:400])
 
-    nMean = pd.DataFrame(nMean)
-    nMean = nMean.T
-    csv_name = f"{dataset_name}{times}_mean_evolution.csv"
-    nMean.to_csv(csv_name, sep=",", index=False)
+    nMean = pd.DataFrame(nMean).T
+    csv_name_mean = f"{dataset_name}_{args.run_id}_mean_evolution.csv"
+    csv_path_mean = os.path.join(output_dir_dataset, csv_name_mean)
+    nMean.to_csv(csv_path_mean, sep=",", index=False)
 
-    nBest = pd.DataFrame(nBest)
-    nBest = nBest.T
-    csv_name = f"{dataset_name}{times}_best_evolution.csv"
-    nBest.to_csv(csv_name, sep=",", index=False)
+    nBest = pd.DataFrame(nBest).T
+    csv_name_best = f"{dataset_name}_{args.run_id}_best_evolution.csv"
+    csv_path_best = os.path.join(output_dir_dataset, csv_name_best)
+    nBest.to_csv(csv_path_best, sep=",", index=False)
 
     txt_filename = f"{dataset_name}_FinalResult.txt"
     txt_path = os.path.join(output_dir_dataset, txt_filename)
-    with open(txt_path, "w") as file:
+    with open(txt_path, 'w') as file:
         mean_results = np.mean(results_by_times, axis=0) if results_by_times else []
         std_results = np.std(results_by_times, axis=0) if results_by_times else []
         mean_time = round(np.mean(time), 2) if time else 0
@@ -128,54 +135,6 @@ def run_experiment(
         file.write("Results, std, mean time, mean rules qtd, mean rules size\n\n")
         file.write(f"{[res.tolist() if isinstance(res, np.ndarray) else res for res in frpd]}\n")
 
-    print(f"--- Experimento para {dataset_name} CONCLUÍDO ---")
-    print(f"Resultados salvos em: {output_dir_dataset}")
+    print(f"--- Concluído ID {args.run_id} em {tmp:.2f}s ---")
+    
 
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Pegar parâmetros EASD")
-    parser.add_argument(
-        "-f",
-        "--filepath",
-        type=str,
-        help="Caminho para o arquivo do dataset - ex: datasets/Mixed/German.csv",
-    )
-    parser.add_argument("-t", "--target_col", type=int, help="Coluna escolhida como alvo", default=4)
-    parser.add_argument(
-        "-d",
-        "--delimiter",
-        type=str,
-        default=",",
-        help="Padrão utilizado para separar caracteres, ex: espaço ou vírgula",
-    )
-    parser.add_argument("-header", "--header", type=int, default=None, help="Indica o índice do dataset")
-    parser.add_argument(
-        "-r", "--runs", type=int, default="30", help="Indica o número de vezes que o algoritmo deve ser executado"
-    )
-    parser.add_argument("-k", "--ksize", type=float, default=10, help="Tamanho do rank de Top-K regras")
-    parser.add_argument("-s", "--support", type=float, default=0.5, help="Suporte mínimo de uma classe")
-    parser.add_argument("-c", "--crossover", type=float, default=50, help="Taxa de crossover")
-    parser.add_argument("-g", "--generations", type=int, default=500, help="Número máximo de gerações")
-    parser.add_argument("-p", "--population", type=int, default=500, help="Tamanho da População")
-    parser.add_argument("-m", "--mutation", type=int, default=50, help="Taxa de Mutação")
-    parser.add_argument("--restart_check", type=int, default=10, help="Número de gerações sem melhora para melhora")
-    parser.add_argument("--restart_pct", type=int, default=10, help="Percentual da população a reiniciar")
-
-    args = parser.parse_args()
-    dataset_name = Path(args.filepath).stem
-    run_experiment(
-        filepath=Path(args.filepath),
-        target_col=args.target_col,
-        dataset_name=dataset_name,
-        delimiter=args.delimiter,
-        header=args.header,
-        runs=args.runs,
-        k_size=args.ksize,
-        sup_class=args.support,
-        crossover_rate=args.crossover,
-        max_generations=args.generations,
-        mutation_rate=args.mutation,
-        population_size=args.population,
-        restart_check=args.restart_check,
-        restart_pct=args.restart_pct,
-    )
