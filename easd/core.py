@@ -13,6 +13,10 @@ from .evaluation import RuleEvaluator
 from .operators import GeneticOperators
 from .dataset import Dataset
 
+EPSILON = 1e-12
+DEFAULT_CROSSOVER_RATE = 60
+DEFAULT_MUTATION_RATE = 40
+RATES_CHANGE_FATOR = 20
 console = Console()
 
 
@@ -22,11 +26,10 @@ class EASD:
         data: pd.DataFrame,
         time_col: str,
         event_col: str,
-        crossover_rate,
         max_generations,
-        mutation_rate,
         population_size,
-        restart_check_point,
+        max_generations_no_improve,
+        max_pop_restarts,
         restart_percentage,
         seed_val,
         comparacao: str,
@@ -34,13 +37,15 @@ class EASD:
         executions,
         ksize,
     ):
-        self.crossover_rate = crossover_rate
-        self.mutation_rate = mutation_rate
+        self.crossover_rate = DEFAULT_CROSSOVER_RATE
+        self.mutation_rate = DEFAULT_MUTATION_RATE
         self.max_generations = max_generations
         self.population_size = population_size
         self.no_improvement_counter = 0
-        self.restart_counter = 0
+        self.restart_counter_consecutive = 0
         self.restart_percentage = restart_percentage
+        self.max_generations_no_improve = max_generations_no_improve
+        self.max_pop_restarts = max_pop_restarts
         self.seed = seed_val
         self.ksize = ksize
         self.top_k_heap = []
@@ -100,66 +105,62 @@ class EASD:
         except (ValueError, TypeError):
             return -1
 
+    def _update_mutation_crossover_rates(self):
+        if (
+            self.prev_best_by_key == self.best_by_key
+            and self.mutation_rate <= 80
+            and self.crossover_rate >= RATES_CHANGE_FATOR
+        ):
+            self.mutation_rate += RATES_CHANGE_FATOR
+            self.crossover_rate -= RATES_CHANGE_FATOR
+
+        if (
+            self.prev_best_by_key != self.best_by_key
+            and self.mutation_rate >= RATES_CHANGE_FATOR
+            and self.crossover_rate <= 80
+        ):
+            self.mutation_rate -= RATES_CHANGE_FATOR
+            self.crossover_rate += RATES_CHANGE_FATOR
+
     def _check_stop(self, gen_count):
         if self.prev_best_by_key == {}:
             self.prev_best_by_key = self.best_by_key.copy()
 
             return True
-        if (
-            self.prev_best_by_key == self.best_by_key and self.mutation_rate == 100 and self.restart_counter >= 3
-        ) or gen_count == self.max_generations:
+        if self.restart_counter_consecutive >= self.max_pop_restarts:
+            print(f"\n{'='*70}")
+            console.log(
+                f"  Critério de parada com {self.max_pop_restarts} reinicializações alcançado.",
+                style="bold green",
+            )
+            print(f"\n{'='*70}")
+
+            return False
+
+        elif gen_count == self.max_generations:
+
             return False
         else:
-            if self.prev_best_by_key == self.best_by_key and self.mutation_rate <= 80 and self.crossover_rate >= 20:
-                self.mutation_rate += 20
-                self.crossover_rate -= 20
-
-            if self.prev_best_by_key != self.best_by_key and self.mutation_rate >= 20 and self.crossover_rate <= 80:
-                self.mutation_rate -= 20
-                self.crossover_rate += 20
-
+            self._update_mutation_crossover_rates()
             self.prev_best_by_key = self.best_by_key.copy()
 
             return True
 
-        # restart_param = False
-
-        # if len(fit_history) == 0:
-        #     fit_history.append(current_fit)
-        #     last_added = len(fit_history) - 1
-        # elif len(fit_history) == 1:
-        #     fit_history.append(current_fit)
-        #     last_added = len(fit_history) - 1
-        # else:
-        #     last_added = len(fit_history) - 1
-
-        # if (current_fit <= fit_history[last_added]) and (check_num < max_times) and (len(fit_history) > 1):
-        #     fit_history.append(current_fit)
-        #     check_num += 1
-        # elif (current_fit > fit_history[last_added]) and (check_num < max_times) and (len(fit_history) > 1):
-        #     fit_history.append(current_fit)
-        #     check_num = 1
-
-        # if check_num == max_times:
-        #     check_num = 0
-        #     fit_history = []
-        #     restart_param = True
-
-        # return fit_history, check_num, restart_param
-
     def _evaluate_improvement(self, population, fitness_list, restart_prct, dataset):
         if self.prev_best_by_key == self.best_by_key and self.mutation_rate == 100:
             self.no_improvement_counter += 1
-        else:
+
+        elif self.prev_best_by_key != self.best_by_key:
             self.no_improvement_counter = 0
-            self.restart_counter = 0
-        if self.no_improvement_counter >= 3 and self.mutation_rate == 100:
+            self.restart_counter_consecutive = 0
+
+        if self.no_improvement_counter >= self.max_generations_no_improve and self.mutation_rate == 100:
             new_population = self._population_restart(population, fitness_list, restart_prct, dataset)
             self.no_improvement_counter = 0
-            self.restart_counter += 1
+            self.restart_counter_consecutive += 1
 
-            self.crossover_rate = 60
-            self.mutation_rate = 40
+            self.crossover_rate = DEFAULT_CROSSOVER_RATE
+            self.mutation_rate = DEFAULT_MUTATION_RATE
 
             self.prev_best_by_key = {}
 
@@ -194,53 +195,73 @@ class EASD:
     def _update_top_k(self, p_population, p_fitness_list):
         for individual, fitness in zip(p_population, p_fitness_list):
             key = self._rule_key(individual)
-
             previous = self.best_by_key.get(key)
+
             if previous is not None:
                 self._update_current_rule(key, previous, individual, fitness)
+                continue
 
-            else:
-                if len(self.best_by_key) < self.ksize:
-                    self._add_rule_to_top_k(key, fitness, individual)
-                else:
-                    if fitness > self.top_k_heap[0][0]:
-                        self._add_rule_to_top_k(key, fitness, individual)
+            if len(self.best_by_key) < self.ksize:
+                self._add_rule_to_top_k(key, fitness, individual)
+                continue
 
-                        while len(self.best_by_key) > self.ksize:
-                            worst_fit, worst_key = heappop(self.top_k_heap)
+            self._prune_heap()
 
-                            current = self.best_by_key.get(worst_key)
-                            if current is not None and current[0] == worst_fit:
-                                del self.best_by_key[worst_key]
+            if not self.top_k_heap:
+                self.top_k_heap = [(v[0], k) for k, v in self.best_by_key.items()]
+                heapify(self.top_k_heap)
+
+            if fitness > self.top_k_heap[0][0]:
+                self._add_rule_to_top_k(key, fitness, individual)
+
+                while len(self.best_by_key) > self.ksize:
+                    self._prune_heap()
+
+                    worst_fit, worst_key = heappop(self.top_k_heap)
+                    current = self.best_by_key.get(worst_key)
+                    if current is not None and abs(current[0] - worst_fit) <= EPSILON:
+                        del self.best_by_key[worst_key]
+
+        if len(self.top_k_heap) >= 2 * len(self.best_by_key):
+            self._rebuild_heap_from_topk()
 
     def _update_current_rule(self, p_rule, p_previous, p_individual, p_fitness):
         """
         Atualiza uma regra que os atributos já estão na lista de top-ks se os invervalos conferem um fitness melhor
         """
         previous_fit, _ = p_previous
-        if p_fitness > previous_fit:
-            self._add_rule_to_top_k(p_rule, p_fitness, p_individual)
-            self.top_k_heap.remove((previous_fit, p_rule))
+        if p_fitness > previous_fit + EPSILON:
+            self.best_by_key[p_rule] = (p_fitness, p_individual)
+            heappush(self.top_k_heap, (p_fitness, p_rule))
+
+    def _rebuild_heap_from_topk(self):
+        self.top_k_heap = []
+        for key, fit in self.best_by_key.items():
+            self.top_k_heap.append((fit[0], key))
+
+        heapify(self.top_k_heap)
 
     def _add_rule_to_top_k(self, p_rule, p_fitness, p_individual):
-        """
-        Adiciona uma regras à lista de top-ks
-        """
         self.best_by_key[p_rule] = (p_fitness, p_individual)
         heappush(self.top_k_heap, (p_fitness, p_rule))
 
     def _rule_key(self, p_individual):
-        """
-        Essa função ordena as regras, para evitar várias regras que são combinações da mesma
-        """
-        # se a ordem dos atributos não importar, use tuple(sorted(...))
         return tuple(sorted(p_individual[0]))
+
+    def _prune_heap(self):
+        while self.top_k_heap:
+            fit, key = self.top_k_heap[0]
+            current = self.best_by_key.get(key)
+            if current is not None and abs(current[0] - fit) <= EPSILON:
+                return
+
+            heappop(self.top_k_heap)
 
     def run(self):
         start_time = time.time()
 
         dataset_x = self.dataset_obj.data
-        df_full = pd.DataFrame(dataset_x, columns=self.dataset_obj.attr_values.keys())
+        df_full = pd.DataFrame(dataset_x, columns=list(self.dataset_obj.attr_values.keys()))
 
         mean_fitness_history = []
         best_fitness_history = []
@@ -253,12 +274,13 @@ class EASD:
         console.print(f"   • Execuções: {self.executions}")
         console.print(f"   • Top-K: {self.ksize} melhores regras")
         console.print(f"   • Crossover: {self.crossover_rate}% | Mutação: {self.mutation_rate}%")
+        console.print(f"   • Critério de Parada: {self.max_pop_restarts} reinicializações")
         print(f"{'='*70}")
 
         for i in range(self.executions):
             print(f"\n>>> Execução {i + 1}/{self.executions}")
 
-            gen_count, check_counter, restart_counter = 0, 0, 0
+            gen_count = 0
 
             population = self.generator.gen_population(self.population_size, dataset_x)
             gen_mean_fitness, gen_best_fitness = [], []
@@ -284,7 +306,6 @@ class EASD:
                         best_fit = np.max(fitness_list)
                         gen_mean_fitness.append(mean_fit)
                         gen_best_fitness.append(best_fit)
-                        current_fitness = best_fit
                         if (gen_count + 1) % 50 == 0:
                             console.log(
                                 f"   Gen {gen_count + 1:3d}: Melhor={best_fit:.4f} | "
@@ -295,7 +316,6 @@ class EASD:
                             f"⚠️ AVISO G{gen_count}: População vazia - Encerrando execução.",
                             style="bold red",
                         )
-                        current_fitness = -np.inf
                         break
 
                     new_population = self._evaluate_improvement(
@@ -307,28 +327,16 @@ class EASD:
 
                     gen_count += 1
 
-                    # fitness_history, check_counter, trigger_restart = self._check_stop(
-                    #     check_counter, current_fitness, self.max_generations, fitness_history
-                    # )
-
-                    # if trigger_restart and restart_counter < 7:
-                    #     population = self._population_restart(
-                    #         population, fitness_list, (self.restart_percentage / 100), dataset_x
-                    #     )
-                    #     check_counter = 0
-                    #     restart_counter += 1
-                    #     print(f"   Restart {restart_counter}/7 acionado na geração {gen_count}")
-                    # elif trigger_restart and gen_count >= int(self.max_generations * 0.8) and restart_counter >= 7:
-                    #     print(f"   Convergência detectada - Finalizando antecipadamente (G{gen_count})")
-                    #     break
-
             mean_fitness_history.append(gen_mean_fitness)
             best_fitness_history.append(gen_best_fitness)
             if gen_best_fitness:
                 final_best = gen_best_fitness[-1]
-                console.log(f"   ✓ Concluída: {gen_count} gerações | " f"Melhor Fitness Final={final_best:.4f}\n")
+                console.log(
+                    f"   ✓ Concluída: {gen_count} gerações | " f"Melhor Fitness Final={final_best:.4f}\n",
+                    style="bold green",
+                )
         print(f"\n{'='*70}")
-        console.log(f" Finalizou {self.executions} execuções em {time.time() - start_time:.2f}s")
+        console.log(f" Finalizou {self.executions} execuções em {time.time() - start_time:.2f}s", style="bold green")
         print(f"{'='*70}")
 
         top_k_values = list(self.best_by_key.values())  # Lista de tuplas (fitness, regra)

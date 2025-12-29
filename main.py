@@ -51,11 +51,15 @@ if __name__ == "__main__":
         help="Padrão utilizado para separar caracteres, ex: espaço ou vírgula",
     )
     parser.add_argument("-header", "--header", type=int, default=0, help="Indica o índice do dataset")
-    parser.add_argument("-c", "--crossover", type=float, default=60, help="Taxa de crossover")
     parser.add_argument("-g", "--generations", type=int, default=500, help="Número máximo de gerações")
     parser.add_argument("-p", "--population", type=int, default=500, help="Tamanho da População")
-    parser.add_argument("-m", "--mutation", type=int, default=40, help="Taxa de Mutação")
-    parser.add_argument("--restart_check", type=int, default=10, help="Número de gerações sem melhora para melhora")
+    parser.add_argument("--restart_gen", type=int, default=3, help="Número limite de gerações sem melhora")
+    parser.add_argument(
+        "--restart_pop",
+        type=int,
+        default=3,
+        help="Número limite de reinicializações da população",
+    )
     parser.add_argument("--restart_pct", type=int, default=10, help="Percentual da população a reiniciar")
     parser.add_argument(
         "-comp",
@@ -67,7 +71,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("-a", "--alpha", type=float, default=0.5, help="Peso Alpha para o Fitness (Default: 0.5)")
     parser.add_argument("-exe", "--executions", type=int, default=1, help="Número de execuções do algoritmo")
-    parser.add_argument("-k", "--ksize", type=float, default=10, help="Tamanho do rank de Top-K regras")
+    parser.add_argument("-k", "--ksize", type=int, default=10, help="Tamanho do rank de Top-K regras")
     parser.add_argument("--seed", type=int, default=42, help="Semente para reprodutibilidade")
     parser.add_argument("-id", "--run_id", type=int, default=0, help="ID da execução para nomear arquivos")
 
@@ -77,7 +81,7 @@ if __name__ == "__main__":
     try:
         data = pd.read_csv(args.filepath, delimiter=args.delimiter, header=args.header, engine="python")
     except FileNotFoundError:
-        print(f"Erro: Arquivo não encontrado em {filepath}")
+        print(f"Erro: Arquivo não encontrado em {args.filepath}")
         sys.exit(1)
     except Exception as e:
         print(f"Erro ao ler o arquivo {e}")
@@ -95,11 +99,10 @@ if __name__ == "__main__":
         data.copy(),
         args.time_col,
         args.event_col,
-        crossover_rate=args.crossover,
         max_generations=args.generations,
-        mutation_rate=args.mutation,
         population_size=args.population,
-        restart_check_point=args.restart_check,
+        max_generations_no_improve=args.restart_gen,
+        max_pop_restarts=args.restart_pop,
         restart_percentage=args.restart_pct,
         seed_val=args.seed,
         comparacao=args.comparacao,
