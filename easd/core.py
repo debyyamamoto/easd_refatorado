@@ -95,6 +95,8 @@ class EASD:
                         if new_min < int_max_val:
                             rule[1][i][0] = new_min
                             break
+        rule = self._label_rules(rule)
+
         return rule
 
     def _get_best(self, population, fitness_list):
@@ -256,6 +258,13 @@ class EASD:
                 return
 
             heappop(self.top_k_heap)
+
+    def _label_rules(self, p_rules: list) -> list:
+        columns_names = list(self.dataset_obj.attr_values.keys())
+        for i, atribute in enumerate(p_rules[0]):
+            p_rules[0][i] = columns_names[atribute]
+
+        return p_rules
 
     def run(self):
         start_time = time.time()
