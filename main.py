@@ -74,6 +74,13 @@ if __name__ == "__main__":
     parser.add_argument("-k", "--ksize", type=int, default=10, help="Tamanho do rank de Top-K regras")
     parser.add_argument("--seed", type=int, default=42, help="Semente para reprodutibilidade")
     parser.add_argument("-id", "--run_id", type=int, default=0, help="ID da execução para nomear arquivos")
+    parser.add_argument(
+        "-n",
+        "--num_plots",
+        type=int,
+        default=3,
+        help="Plota os Top-N melhores regras encontradas no Top-K. Se for zero nenhum plot é salvo.",
+    )
 
     args = parser.parse_args()
     dataset_name = Path(args.filepath).stem
@@ -109,11 +116,12 @@ if __name__ == "__main__":
         alpha=args.alpha,
         executions=args.executions,
         ksize=args.ksize,
+        plot_n_rules=args.num_plots,
     )
 
     # Executa
     print(f"--- Rodando dataset {dataset_name} (ID: {args.run_id}) ---")
-    (results, Mean, best, tmp, rulesQND, Info, DetailedRules, meanSize) = sd.run()
+    (results, Mean, best, tmp, rulesQND, Info, DetailedRules, meanSize, figures_list) = sd.run()
 
     # Coleta Métricas
     n_rules.append(rulesQND)
@@ -158,5 +166,11 @@ if __name__ == "__main__":
         frpd = [mean_results, std_results, mean_time, mean_n_rules, mean_rules_size]
         file.write("Results, std, mean time, mean rules qtd, mean rules size\n\n")
         file.write(f"{[res.tolist() if isinstance(res, np.ndarray) else res for res in frpd]}\n")
+
+    for i, figure in enumerate(figures_list):
+        if i == 0:
+            figure.savefig(f"{output_dir_dataset}/top-{args.num_plots}_rules.png")
+        else:
+            figure.savefig(f"{output_dir_dataset}/top-{i+1}_rule.png")
 
     print(f"--- Concluído ID {args.run_id} em {tmp:.2f}s ---")

@@ -12,6 +12,7 @@ from .population import PopulationGenerator
 from .evaluation import RuleEvaluator
 from .operators import GeneticOperators
 from .dataset import Dataset
+from .visualization import RulesPlotter
 
 EPSILON = 1e-12
 DEFAULT_CROSSOVER_RATE = 60
@@ -36,7 +37,10 @@ class EASD:
         alpha,
         executions,
         ksize,
+        plot_n_rules: int,
     ):
+        self.survival_event_col = event_col
+        self.survival_time_col = time_col
         self.crossover_rate = DEFAULT_CROSSOVER_RATE
         self.mutation_rate = DEFAULT_MUTATION_RATE
         self.max_generations = max_generations
@@ -58,6 +62,7 @@ class EASD:
         self.evaluation = RuleEvaluator(self.dataset_obj, comparacao, self.alpha)
         self.operators = GeneticOperators(self.evaluation, self._get_best)
         self.executions = executions
+        self.top_n_plot = plot_n_rules
         seed(self.seed)
 
     def _adjust_interval(self, rule, dataset):
@@ -259,7 +264,7 @@ class EASD:
 
             heappop(self.top_k_heap)
 
-    def _label_rules(self, p_rules: list) -> list:
+    def _label_rules(self, p_rules: list) -> list[list]:
         columns_names = list(self.dataset_obj.attr_values.keys())
         for i, atribute in enumerate(p_rules[0]):
             p_rules[0][i] = columns_names[atribute]
@@ -386,6 +391,9 @@ class EASD:
         console.print(f"   • Tempo total: {total_time:.2f}s")
         print(f"{'='*70}\n")
         detailed_rules_df = pd.DataFrame({"Rule_Obj": [str(r) for r in final_rules_found], "Rule_Score": rules_scores})
+        figures_list = RulesPlotter(
+            self.dataset_obj._original_data, final_rules_found, self.survival_event_col, self.survival_time_col
+        ).kaplan_meier(self.top_n_plot)
 
         # Info: Resumo básico
         info_df = pd.DataFrame(
@@ -406,4 +414,5 @@ class EASD:
             info_df,
             detailed_rules_df,
             mean_size,
+            figures_list,
         )
