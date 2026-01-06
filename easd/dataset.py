@@ -5,6 +5,7 @@ import numpy as np
 class Dataset:
 
     def __init__(self, data, attr_survival_name, attr_event_name):
+        data = self._binarize_events(data, attr_event_name)
         self.survival_times = ()
         self.average_survival = None
         self.events = ()
@@ -12,10 +13,10 @@ class Dataset:
         self.data = None
 
         self._col_index = {}
-        self._uncovered_cases = [True]*data.shape[0]
+        self._uncovered_cases = [True] * data.shape[0]
         self._original_data = data.copy()
         self._surv_name = attr_survival_name
-        self._count = [0]*data.shape[0]
+        self._count = [0] * data.shape[0]
 
         self._constructor(attr_survival_name, attr_event_name)
 
@@ -42,10 +43,15 @@ class Dataset:
         self.data = np.array(data.values)
         return
 
+    def _binarize_events(self, data: pd.DataFrame, event_col: str):
+        data[event_col] = data[event_col].replace(min(data[event_col]), 0)
+        data[event_col] = data[event_col].replace(max(data[event_col]), 1)
+
+        return data
+
     @property
     def size(self):
-        """
-        """
+        """ """
         return self._original_data.shape[0]
 
     @property
@@ -57,7 +63,7 @@ class Dataset:
             if self._count[case] <= 1:  # if covered only once > becomes uncovered
                 self._count[case] = 0
                 self._uncovered_cases[case] = True
-            else:                       # if covered more than once > decrements cover count
+            else:  # if covered more than once > decrements cover count
                 self._count[case] -= 1
         return
 
@@ -77,7 +83,7 @@ class Dataset:
     def get_data(self):
         return self._original_data.copy()
 
-    def get_cases_coverage(self):   # returns a bool list with True for covered cases
+    def get_cases_coverage(self):  # returns a bool list with True for covered cases
         return [covered == False for covered in self._uncovered_cases]
 
     def get_no_of_uncovered_cases(self):
@@ -87,7 +93,5 @@ class Dataset:
         return list(self._original_data[self._uncovered_cases].index)
 
     def get_instances(self):
-        """
-        
-        """
+        """ """
         return list(range(len(self.data)))

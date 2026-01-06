@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import pandas as pd
+import pandas.api.types as ptypes
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -75,8 +76,12 @@ class RulesPlotter:
         rule_df = self.dataset.copy()
         atributes_list, constraints_list = p_rule
         for atribute, constraint in zip(atributes_list, constraints_list):
-            rule_df = rule_df[(rule_df[atribute] >= constraint[0]) & (rule_df[atribute] <= constraint[1])]
-            rule_string = f"{rule_string} ({constraint[0]}≤{atribute}≤{constraint[1]})"
+            if not ptypes.is_string_dtype(rule_df[atribute].dtype):
+                rule_df = rule_df[(rule_df[atribute] >= constraint[0]) & (rule_df[atribute] <= constraint[1])]
+                rule_string = f"{rule_string} ({constraint[0]}≤{atribute}≤{constraint[1]})"
+            else:
+                rule_df = rule_df[rule_df[atribute].isin(constraint)]
+                rule_string = f"{rule_string} ({atribute}={constraint})"
 
         fitter = KaplanMeierFitter(label=rule_string)
         fitter.fit(rule_df[self.time_column], rule_df[self.events_column])
@@ -88,11 +93,14 @@ class RulesPlotter:
         rule_complement_df = self.dataset.copy()
         atributes_list, constraints_list = p_rule
         for atribute, constraint in zip(atributes_list, constraints_list):
-            rule_df = rule_df[(rule_df[atribute] >= constraint[0]) & (rule_df[atribute] <= constraint[1])]
-            rule_complement_df = rule_complement_df[
-                ~((rule_complement_df[atribute] >= constraint[0]) & (rule_complement_df[atribute] <= constraint[1]))
-            ]
-            rule_string = f"{rule_string} ({constraint[0]}≤{atribute}≤{constraint[1]})"
+            if not ptypes.is_string_dtype(rule_df[atribute].dtype):
+                rule_df = rule_df[(rule_df[atribute] >= constraint[0]) & (rule_df[atribute] <= constraint[1])]
+                rule_string = f"{rule_string} ({constraint[0]}≤{atribute}≤{constraint[1]})"
+            else:
+                rule_df = rule_df[rule_df[atribute].isin(constraint)]
+                rule_string = f"{rule_string} ({atribute}={constraint})"
+        complement_indices = self.dataset.index.difference(rule_df.index)
+        rule_complement_df = self.dataset.loc[complement_indices]
 
         if rule_complement_df.empty:
             rule_complement_df = self.dataset
@@ -106,10 +114,10 @@ class RulesPlotter:
 
 
 if __name__ == "__main__":
-    df = pd.read_csv("datasets/cancer.csv")
+    df = pd.read_parquet("datasets/cancer.parquet")
     rules = [
-        [["ph-ecog"], [[np.float64(0.0), np.float64(3.0)]]],
-        [["age", "sex"], [[np.float64(54.0), np.float64(82.0)], [np.float64(1.0), np.float64(1.0)]]],
+        [["ph-ecog"], [["3.0", "0.0"]]],
+        [["age", "sex"], [[np.float64(54.0), np.float64(82.0)], ["1", "2"]]],
     ]
 
     plotter = RulesPlotter(df, rules, events_column="status", time_column="time")

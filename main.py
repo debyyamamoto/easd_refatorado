@@ -86,7 +86,7 @@ if __name__ == "__main__":
     dataset_name = Path(args.filepath).stem
 
     try:
-        data = pd.read_csv(args.filepath, delimiter=args.delimiter, header=args.header, engine="python")
+        data = pd.read_parquet(args.filepath)
     except FileNotFoundError:
         print(f"Erro: Arquivo não encontrado em {args.filepath}")
         sys.exit(1)

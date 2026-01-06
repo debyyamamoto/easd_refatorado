@@ -1,0 +1,11 @@
+{
+    "time": "int64",
+    "status": "int64",
+    "age": "int64",
+    "sex": "string",
+    "ph-ecog": "string",
+    "ph-karno": "float32",
+    "pat-karno": "float32",
+    "meal-cal": "float32",
+    "wt-loss": "float32"
+}
