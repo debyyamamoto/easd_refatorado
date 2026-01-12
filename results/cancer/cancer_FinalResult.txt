@@ -1,3 +1,0 @@
-Results, std, mean time, mean rules qtd, mean rules size
-
-[[0.7960881038641834, 0.9956003328331969, 0.5936338032312739, 0.14004084422881824], [0.0, 0.0, 0.0, 0.0], np.float64(557.11), np.float64(10.0), np.float64(1.6)]
