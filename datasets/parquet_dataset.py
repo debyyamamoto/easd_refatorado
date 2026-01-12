@@ -2,6 +2,8 @@ import os
 import json
 import pandas as pd
 
+UNNAMED_COLUMN = "Unnamed: 0"
+
 
 class ParquetDataset:
     def __init__(self, dataset_name: str) -> None:
@@ -31,6 +33,8 @@ class ParquetDataset:
         else:
             raise ValueError(f"Error: Unsupported file format '{ext}'")
 
+        if UNNAMED_COLUMN in df.columns:
+            df = df.drop(columns=[UNNAMED_COLUMN])
         return df
 
     def _read_schema(self, p_path: str) -> dict:

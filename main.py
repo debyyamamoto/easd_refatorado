@@ -169,8 +169,8 @@ if __name__ == "__main__":
 
     for i, figure in enumerate(figures_list):
         if i == 0:
-            figure.savefig(f"{output_dir_dataset}/top-{args.num_plots}_rules.png")
+            figure.savefig(f"{output_dir_dataset}/top-{args.num_plots}_best_rules.png")
         else:
-            figure.savefig(f"{output_dir_dataset}/top-{i+1}_rule.png")
+            figure.savefig(f"{output_dir_dataset}/top-{i}_rule.png")
 
     print(f"--- Concluído ID {args.run_id} em {tmp:.2f}s ---")
