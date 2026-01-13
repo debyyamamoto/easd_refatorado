@@ -1,10 +1,13 @@
-import argparse
-import matplotlib
-import numpy as np
+# import cProfile
 import os
-import pandas as pd
-from pathlib import Path
 import sys
+import argparse
+from argparse import Namespace
+from pathlib import Path
+import numpy as np
+import pandas as pd
+import matplotlib
+
 
 # Anti-Grain Geometry, trava pop-ups
 matplotlib.use("Agg")
@@ -23,10 +26,102 @@ except ImportError as e:
 base_output = os.path.join(os.path.dirname(__file__), "results")
 os.makedirs(base_output, exist_ok=True)
 
+
+def run_main(args: Namespace):
+    if args.seed is not None:
+        num_executions = 1
+    else:
+        num_executions = args.executions
+
+    try:
+        data = pd.read_parquet(args.filepath)
+    except FileNotFoundError:
+        print(f"Erro: Arquivo não encontrado em {args.filepath}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Erro ao ler o arquivo {e}")
+        sys.exit(1)
+
+    output_dir_dataset = os.path.join(base_output, dataset_name)
+    os.makedirs(output_dir_dataset, exist_ok=True)
+
+    figures_list = []
+    for run in range(num_executions):
+        if args.seed is not None:
+            seed = args.seed
+        else:
+            seed = run
+
+        sd = EASD(
+            data.copy(),
+            args.time_col,
+            args.event_col,
+            max_generations=args.generations,
+            population_size=args.population,
+            max_generations_no_improve=args.restart_gen,
+            max_pop_restarts=args.restart_pop,
+            restart_percentage=args.restart_pct,
+            seed_val=seed,
+            comparacao=args.comparacao,
+            alpha=args.alpha,
+            ksize=args.ksize,
+            plot_n_rules=args.num_plots,
+        )
+
+        print(f"--- Rodando dataset {dataset_name} (ID: {run+1}/{num_executions}) ---")
+        (_, _, _, tmp, _, info, detailed_rules, mean_rule_size, figures_list) = sd.run()
+
+        _save_results(detailed_rules, tmp, float(mean_rule_size), run, info, output_dir_dataset)
+
+    _save_stats_and_plots(output_dir_dataset, figures_list)
+
+
+def _save_results(
+    p_detailed_rules: pd.DataFrame,
+    p_runtime: float,
+    p_mean_rule_size: float,
+    p_run: int,
+    p_info: pd.DataFrame,
+    p_output_dir_dataset: str,
+):
+    scores_list.append(p_detailed_rules["Rule_Score"].values)
+    runtime_list.append(round(p_runtime, 2))
+    mean_rule_size_list.append(p_mean_rule_size)
+
+    csv_filename_detailed = f"{dataset_name}_{p_run}_DetailedRules.csv"
+    csv_path_detailed = os.path.join(p_output_dir_dataset, csv_filename_detailed)
+    p_detailed_rules.to_csv(csv_path_detailed, sep=",", index=False)
+
+    csv_filename_info = f"{dataset_name}_{p_run}_Info.csv"
+    csv_path_info = os.path.join(p_output_dir_dataset, csv_filename_info)
+    p_info.to_csv(csv_path_info, sep=",", index=False)
+
+
+def _save_stats_and_plots(p_output_dir_dataset: str, p_figures_list: list):
+    stats_filename = f"{dataset_name}_RulesStatsResult.csv"
+    stats_path = os.path.join(p_output_dir_dataset, stats_filename)
+    stats_data = {
+        "mean_score": [f"{np.mean(scores_list)}±{np.std(scores_list)}"],
+        "mean_runtime": [f"{round(np.mean(runtime_list), 2)}±{round(np.std(runtime_list), 2)}"],
+        "mean_rule_size": [f"{round(np.mean(mean_rule_size_list), 2)}±{round(np.std(mean_rule_size_list), 2)}"],
+    }
+    stats_data = pd.DataFrame(stats_data)
+    stats_data.to_csv(stats_path)
+    for i, figure in enumerate(p_figures_list):
+        if i == 0:
+            figure.savefig(f"{p_output_dir_dataset}/top-{args.num_plots}_best_rules.png")
+        else:
+            figure.savefig(f"{p_output_dir_dataset}/top-{i}_rule.png")
+
+
 if __name__ == "__main__":
+    scores_list, runtime_list, mean_rule_size_list = [], [], []
+
     parser = argparse.ArgumentParser(description="EASD")
     # Argumentos Obrigatórios
-    parser.add_argument("filepath", type=str, help="Caminho para o arquivo do dataset - ex: datasets/Mixed/German.csv")
+    parser.add_argument(
+        "filepath", type=str, help="Caminho para o arquivo do dataset - ex: datasets/Mixed/German.parquet"
+    )
     parser.add_argument(
         "-time",
         "--time_col",
@@ -44,13 +139,11 @@ if __name__ == "__main__":
 
     # Argumentos Opcionais (com Defaults)
     parser.add_argument(
-        "-d",
-        "--delimiter",
-        type=str,
-        default=",",
-        help="Padrão utilizado para separar caracteres, ex: espaço ou vírgula",
+        "--seed",
+        type=int,
+        default=None,
+        help="Semente para reprodutibilidade. Se uma seed for estabelecida, apenas uma execução do algoritmo será feita.",
     )
-    parser.add_argument("-header", "--header", type=int, default=0, help="Indica o índice do dataset")
     parser.add_argument("-g", "--generations", type=int, default=500, help="Número máximo de gerações")
     parser.add_argument("-p", "--population", type=int, default=500, help="Tamanho da População")
     parser.add_argument("--restart_gen", type=int, default=3, help="Número limite de gerações sem melhora")
@@ -72,91 +165,17 @@ if __name__ == "__main__":
     parser.add_argument("-a", "--alpha", type=float, default=0.5, help="Peso Alpha para o Fitness (Default: 0.5)")
     parser.add_argument("-exe", "--executions", type=int, default=1, help="Número de execuções do algoritmo")
     parser.add_argument("-k", "--ksize", type=int, default=10, help="Tamanho do rank de Top-K regras")
-    parser.add_argument("--seed", type=int, default=42, help="Semente para reprodutibilidade")
-    parser.add_argument("-id", "--run_id", type=int, default=0, help="ID da execução para nomear arquivos")
-
-    args = parser.parse_args()
-    dataset_name = Path(args.filepath).stem
-
-    try:
-        data = pd.read_csv(args.filepath, delimiter=args.delimiter, header=args.header, engine="python")
-    except FileNotFoundError:
-        print(f"Erro: Arquivo não encontrado em {args.filepath}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Erro ao ler o arquivo {e}")
-        sys.exit(1)
-
-    nMean, nBest = [], []
-    results_by_times, time, n_rules, rules_size = [], [], [], []
-
-    output_dir_dataset = os.path.join(base_output, dataset_name)
-    os.makedirs(output_dir_dataset, exist_ok=True)
-
-    print(f"Processando Dataset: {dataset_name} ({args.executions} execuções)...")
-
-    sd = EASD(
-        data.copy(),
-        args.time_col,
-        args.event_col,
-        max_generations=args.generations,
-        population_size=args.population,
-        max_generations_no_improve=args.restart_gen,
-        max_pop_restarts=args.restart_pop,
-        restart_percentage=args.restart_pct,
-        seed_val=args.seed,
-        comparacao=args.comparacao,
-        alpha=args.alpha,
-        executions=args.executions,
-        ksize=args.ksize,
+    parser.add_argument(
+        "-n",
+        "--num_plots",
+        type=int,
+        default=0,
+        help="Plota os Top-N melhores regras encontradas no Top-K. Se for zero nenhum plot é salvo.",
     )
 
-    # Executa
-    print(f"--- Rodando dataset {dataset_name} (ID: {args.run_id}) ---")
-    (results, Mean, best, tmp, rulesQND, Info, DetailedRules, meanSize) = sd.run()
+    args = parser.parse_args()
 
-    # Coleta Métricas
-    n_rules.append(rulesQND)
-    rules_size.append(meanSize)
-    time.append(round(tmp, 2))
-    results_by_times.append(results)
+    dataset_name = Path(args.filepath).stem
 
-    # Salva CSVs da execução atual
-    csv_filename_detailed = f"{dataset_name}_{args.run_id}_DetailedRules.csv"
-    csv_path_detailed = os.path.join(output_dir_dataset, csv_filename_detailed)
-    DetailedRules.to_csv(csv_path_detailed, sep=",", index=False)
-
-    csv_filename_info = f"{dataset_name}_{args.run_id}_Info.csv"
-    csv_path_info = os.path.join(output_dir_dataset, csv_filename_info)
-    Info.to_csv(csv_path_info, sep=",", index=False)
-
-    # Guardar valores intermediários para gerar dados convergência depois
-    for m in Mean:
-        nMean.append(m[:400])
-    for b in best:
-        nBest.append(b[:400])
-
-    nMean = pd.DataFrame(nMean).T
-    csv_name_mean = f"{dataset_name}_{args.run_id}_mean_evolution.csv"
-    csv_path_mean = os.path.join(output_dir_dataset, csv_name_mean)
-    nMean.to_csv(csv_path_mean, sep=",", index=False)
-
-    nBest = pd.DataFrame(nBest).T
-    csv_name_best = f"{dataset_name}_{args.run_id}_best_evolution.csv"
-    csv_path_best = os.path.join(output_dir_dataset, csv_name_best)
-    nBest.to_csv(csv_path_best, sep=",", index=False)
-
-    txt_filename = f"{dataset_name}_FinalResult.txt"
-    txt_path = os.path.join(output_dir_dataset, txt_filename)
-    with open(txt_path, "w") as file:
-        mean_results = np.mean(results_by_times, axis=0) if results_by_times else []
-        std_results = np.std(results_by_times, axis=0) if results_by_times else []
-        mean_time = round(np.mean(time), 2) if time else 0
-        mean_n_rules = round(np.mean(n_rules), 2) if n_rules else 0
-        mean_rules_size = round(np.mean(rules_size), 2) if rules_size else 0
-
-        frpd = [mean_results, std_results, mean_time, mean_n_rules, mean_rules_size]
-        file.write("Results, std, mean time, mean rules qtd, mean rules size\n\n")
-        file.write(f"{[res.tolist() if isinstance(res, np.ndarray) else res for res in frpd]}\n")
-
-    print(f"--- Concluído ID {args.run_id} em {tmp:.2f}s ---")
+    # cProfile.run(f"run_main({args})", sort="cumtime")
+    run_main(args)
