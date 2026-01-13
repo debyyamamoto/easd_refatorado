@@ -86,6 +86,8 @@ class RuleEvaluator:
             except (ValueError, ZeroDivisionError, Exception) as e:
                 p_value = 1.0
         suporte_relativo = len(indices_group_regra) / len(self._all_indices)
+        if suporte_relativo > 0.55 or suporte_relativo < 0.05:
+            return 0.0  # p=1 => fitness 0
         return (1 - p_value) * (suporte_relativo**self.alpha)
 
     def get_fitness(self, population, dataset_x):
