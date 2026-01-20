@@ -16,6 +16,7 @@ class Dataset:
         self._uncovered_cases = [True] * data.shape[0]
         self._original_data = data.copy()
         self._surv_name = attr_survival_name
+        self._event_name = attr_event_name
         self._count = [0] * data.shape[0]
 
         self._constructor(attr_survival_name, attr_event_name)

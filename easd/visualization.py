@@ -7,7 +7,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from lifelines import KaplanMeierFitter
 
-POPULATION = "Population"
+POPULATION = "Baseline Population"
 COMPLEMENT = "Complement"
 
 
@@ -41,7 +41,7 @@ class RulesPlotter:
 
         fitter = KaplanMeierFitter(label=POPULATION)
         fitter.fit(self.dataset[self.time_column], self.dataset[self.events_column])
-        fitter.plot_survival_function(ax=ax)
+        fitter.plot_survival_function(ax=ax, linestyle="dashed", ci_show=False)
 
         for rule in self.rules[:p_num_top]:
             self._plot_rules_curves(rule, ax)
@@ -75,13 +75,19 @@ class RulesPlotter:
         rule_string = ""
         rule_df = self.dataset.copy()
         atributes_list, constraints_list = p_rule
-        for atribute, constraint in zip(atributes_list, constraints_list):
+        for idx, (atribute, constraint) in enumerate(zip(atributes_list, constraints_list)):
             if not ptypes.is_string_dtype(rule_df[atribute].dtype):
                 rule_df = rule_df[(rule_df[atribute] >= constraint[0]) & (rule_df[atribute] <= constraint[1])]
-                rule_string = f"{rule_string} ({constraint[0]}≤{atribute}≤{constraint[1]})"
+                if len(constraints_list) > 1 and idx != len(constraints_list) - 1:
+                    rule_string = f"{rule_string} {constraint[0]}≤{atribute}≤{constraint[1]} ^"
+                else:
+                    rule_string = f"{rule_string} {constraint[0]}≤{atribute}≤{constraint[1]}"
             else:
                 rule_df = rule_df[rule_df[atribute].isin(constraint)]
-                rule_string = f"{rule_string} ({atribute}={constraint})"
+                if len(constraints_list) > 1 and idx != len(constraints_list) - 1:
+                    rule_string = f"{rule_string} {atribute}∈{set(constraint)} ^"
+                else:
+                    rule_string = f"{rule_string} {atribute}∈{set(constraint)}"
 
         fitter = KaplanMeierFitter(label=rule_string)
         fitter.fit(rule_df[self.time_column], rule_df[self.events_column])
@@ -92,15 +98,26 @@ class RulesPlotter:
         rule_df = self.dataset.copy()
         rule_complement_df = self.dataset.copy()
         atributes_list, constraints_list = p_rule
-        for atribute, constraint in zip(atributes_list, constraints_list):
+        for idx, (atribute, constraint) in enumerate(zip(atributes_list, constraints_list)):
             if not ptypes.is_string_dtype(rule_df[atribute].dtype):
                 rule_df = rule_df[(rule_df[atribute] >= constraint[0]) & (rule_df[atribute] <= constraint[1])]
-                rule_string = f"{rule_string} ({constraint[0]}≤{atribute}≤{constraint[1]})"
+                if len(constraints_list) > 1 and idx != len(constraints_list) - 1:
+                    rule_string = f"{rule_string} {constraint[0]}≤{atribute}≤{constraint[1]} ^"
+                else:
+                    rule_string = f"{rule_string} {constraint[0]}≤{atribute}≤{constraint[1]}"
             else:
                 rule_df = rule_df[rule_df[atribute].isin(constraint)]
-                rule_string = f"{rule_string} ({atribute}={constraint})"
+                if len(constraints_list) > 1 and idx != len(constraints_list) - 1:
+                    rule_string = f"{rule_string} {atribute}∈{set(constraint)} ^"
+                else:
+                    rule_string = f"{rule_string} {atribute}∈{set(constraint)}"
+
         complement_indices = self.dataset.index.difference(rule_df.index)
         rule_complement_df = self.dataset.loc[complement_indices]
+
+        fitter = KaplanMeierFitter(label=POPULATION)
+        fitter.fit(self.dataset[self.time_column], self.dataset[self.events_column])
+        fitter.plot_survival_function(ax=p_ax, linestyle="dashed", ci_show=False)
 
         if rule_complement_df.empty:
             rule_complement_df = self.dataset
