@@ -1,0 +1,8 @@
+{
+    "t_tdm": "int64",
+    "e_tdm": "int64",
+    "age": "int64",
+    "size": "float32",
+    "grade": "string",
+    "er": "string"
+}

@@ -7,6 +7,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib
+from easd.core import EASD
+from easd.metrics import compute_run_metrics, output_metrics
 
 
 # Anti-Grain Geometry, trava pop-ups
@@ -17,11 +19,6 @@ dir_path = os.path.dirname(__file__)
 if dir_path not in sys.path:
     sys.path.append(dir_path)
 
-try:
-    from easd.core import EASD
-except ImportError as e:
-    print(f"Erro de Importação: {e}")
-    sys.exit(1)
 
 base_output = os.path.join(os.path.dirname(__file__), "results")
 os.makedirs(base_output, exist_ok=True)
@@ -30,8 +27,10 @@ os.makedirs(base_output, exist_ok=True)
 def run_main(args: Namespace):
     if args.seed is not None:
         num_executions = 1
+        num_plots = args.num_plots
     else:
         num_executions = args.executions
+        num_plots = 0
 
     try:
         data = pd.read_parquet(args.filepath)
@@ -46,6 +45,7 @@ def run_main(args: Namespace):
     os.makedirs(output_dir_dataset, exist_ok=True)
 
     figures_list = []
+    metrics_list = []
     for run in range(num_executions):
         if args.seed is not None:
             seed = args.seed
@@ -65,15 +65,24 @@ def run_main(args: Namespace):
             comparacao=args.comparacao,
             alpha=args.alpha,
             ksize=args.ksize,
-            plot_n_rules=args.num_plots,
+            plot_n_rules=num_plots,
         )
 
         print(f"--- Rodando dataset {dataset_name} (ID: {run+1}/{num_executions}) ---")
-        (_, _, _, tmp, _, info, detailed_rules, mean_rule_size, figures_list) = sd.run()
+        (_, _, _, tmp, _, info, detailed_rules, top_rules, mean_rule_size, figures_list) = sd.run()
+        run_metrics = compute_run_metrics(
+            data,
+            top_rules,
+            time_col=args.time_col,
+            event_col=args.event_col,
+            dataset_obj=sd.dataset_obj,  # importante se suas regras usam índices inteiros
+            baseline=args.comparacao,
+        ).as_dict()
+        metrics_list.append(run_metrics)
 
         _save_results(detailed_rules, tmp, float(mean_rule_size), run, info, output_dir_dataset)
 
-    _save_stats_and_plots(output_dir_dataset, figures_list)
+    _save_stats_and_plots(output_dir_dataset, figures_list, metrics_list)
 
 
 def _save_results(
@@ -97,16 +106,21 @@ def _save_results(
     p_info.to_csv(csv_path_info, sep=",", index=False)
 
 
-def _save_stats_and_plots(p_output_dir_dataset: str, p_figures_list: list):
+def _save_stats_and_plots(p_output_dir_dataset: str, p_figures_list: list, p_metrics_list: list[dict]):
     stats_filename = f"{dataset_name}_RulesStatsResult.csv"
+    metrics_filename = f"{dataset_name}_RulesMetricsResult.csv"
     stats_path = os.path.join(p_output_dir_dataset, stats_filename)
+    metrics_path = os.path.join(p_output_dir_dataset, metrics_filename)
     stats_data = {
         "mean_score": [f"{np.mean(scores_list)}±{np.std(scores_list)}"],
         "mean_runtime": [f"{round(np.mean(runtime_list), 2)}±{round(np.std(runtime_list), 2)}"],
         "mean_rule_size": [f"{round(np.mean(mean_rule_size_list), 2)}±{round(np.std(mean_rule_size_list), 2)}"],
     }
     stats_data = pd.DataFrame(stats_data)
-    stats_data.to_csv(stats_path)
+    stats_data.round(2).to_csv(stats_path)
+
+    output_metrics(p_metrics_list, metrics_path)
+
     for i, figure in enumerate(p_figures_list):
         if i == 0:
             figure.savefig(f"{p_output_dir_dataset}/top-{args.num_plots}_best_rules.png")
@@ -166,8 +180,8 @@ if __name__ == "__main__":
     parser.add_argument("-exe", "--executions", type=int, default=1, help="Número de execuções do algoritmo")
     parser.add_argument("-k", "--ksize", type=int, default=10, help="Tamanho do rank de Top-K regras")
     parser.add_argument(
-        "-n",
-        "--num_plots",
+        "-plt",
+        "--plt_rank",
         type=int,
         default=0,
         help="Plota os Top-N melhores regras encontradas no Top-K. Se for zero nenhum plot é salvo.",

@@ -1,0 +1,15 @@
+{
+    "time_d": "int64",
+    "censor_d": "int64",
+    "tx": "string",
+    "txgrp": "string",
+    "strat2": "string",
+    "sex": "string",
+    "raceth": "string",
+    "ivdrug": "string",
+    "hemophil": "string",
+    "karnof": "string",
+    "cd4": "float32",
+    "priorzdv": "int64",
+    "age": "int64"
+}

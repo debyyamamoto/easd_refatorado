@@ -401,6 +401,7 @@ class EASD:
             rules_qtd,
             info_df,
             detailed_rules_df,
+            final_rules_found,
             mean_size,
             figures_list,
         )
