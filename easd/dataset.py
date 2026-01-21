@@ -21,6 +21,10 @@ class Dataset:
 
         self._constructor(attr_survival_name, attr_event_name)
 
+        self._map_rules_columns = {}
+        for key, value in self._col_index.items():
+            self._map_rules_columns[value] = key
+
     def _constructor(self, attr_survival_name, attr_event_name):
 
         data = self._original_data.copy()
@@ -81,7 +85,10 @@ class Dataset:
     def get_col_index(self, col_name):
         return self._col_index[col_name]
 
-    def get_data(self):
+    def get_col_name(self, col_index):
+        return self._map_rules_columns[col_index]
+
+    def get_data(self) -> pd.DataFrame:
         return self._original_data.copy()
 
     def get_cases_coverage(self):  # returns a bool list with True for covered cases

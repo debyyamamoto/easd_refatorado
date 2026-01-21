@@ -1,0 +1,12 @@
+{
+    "time": "int64",
+    "status": "int64",
+    "horTh": "string",
+    "age": "int64",
+    "menostat": "string",
+    "tsize": "float32",
+    "tgrade": "string",
+    "pnodes": "int64",
+    "progrec": "int64",
+    "estrec": "int64"
+}
