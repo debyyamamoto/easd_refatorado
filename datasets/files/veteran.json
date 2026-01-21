@@ -1,0 +1,10 @@
+{
+    "survival": "int64",
+    "status": "int64",
+    "treat": "string",
+    "cell-type": "string",
+    "karno": "int64",
+    "mfd": "int64",
+    "age": "int64",
+    "pt": "string"
+}
