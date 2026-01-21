@@ -1,0 +1,18 @@
+{
+    "los": "int64",
+    "dstat": "int64",
+    "age": "int64",
+    "gender": "string",
+    "hr": "int64",
+    "sysbp": "int64",
+    "diasbp": "int64",
+    "bmi": "int64",
+    "cvd": "string",
+    "afb": "string",
+    "sho": "string",
+    "chf": "string",
+    "av3": "string",
+    "miord": "string",
+    "mitype": "string",
+    "year": "string"
+}

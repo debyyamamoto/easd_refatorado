@@ -1,0 +1,9 @@
+{
+    "survival": "int64",
+    "status": "int64",
+    "sex": "string",
+    "age": "int64",
+    "op-year": "int64",
+    "tumor-th": "float32",
+    "ulceration": "string"
+}

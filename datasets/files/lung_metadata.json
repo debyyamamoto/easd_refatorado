@@ -1,5 +1,5 @@
 {
-    "suvival": "int64",
+    "survival": "int64",
     "status": "int64",
     "group": "string",
     "detec": "string",
