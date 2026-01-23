@@ -27,7 +27,7 @@ os.makedirs(base_output, exist_ok=True)
 def run_main(args: Namespace):
     if args.seed is not None:
         num_executions = 1
-        num_plots = args.num_plots
+        num_plots = args.plt_rank
     else:
         num_executions = args.executions
         num_plots = 0
@@ -66,6 +66,7 @@ def run_main(args: Namespace):
             alpha=args.alpha,
             ksize=args.ksize,
             plot_n_rules=num_plots,
+            coverage_threshold = args.threshold
         )
 
         print(f"--- Rodando dataset {dataset_name} (ID: {run+1}/{num_executions}) ---")
@@ -157,6 +158,13 @@ if __name__ == "__main__":
         type=int,
         default=None,
         help="Semente para reprodutibilidade. Se uma seed for estabelecida, apenas uma execução do algoritmo será feita.",
+    )
+    parser.add_argument(
+        "-th",
+        "--threshold",
+        type=float,
+        default = 0.9,
+        help="Limiar de similaridade de Jaccard para redundância (default: 0.9)"
     )
     parser.add_argument("-g", "--generations", type=int, default=500, help="Número máximo de gerações")
     parser.add_argument("-p", "--population", type=int, default=500, help="Tamanho da População")
