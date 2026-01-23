@@ -1,0 +1,11 @@
+{
+    "futime": "int64",
+    "status": "int64",
+    "age": "int64",
+    "sex": "string",
+    "hgb": "float32",
+    "creat": "float32",
+    "mspike": "float32",
+    "ptime": "int64",
+    "pstat": "string"
+}

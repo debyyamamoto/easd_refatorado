@@ -1,0 +1,21 @@
+{
+    "survival": "int64",
+    "status": "int64",
+    "drug": "string",
+    "age": "int64",
+    "sex": "string",
+    "ascites": "string",
+    "hp": "string",
+    "spiders": "string",
+    "edema": "string",
+    "sb": "float32",
+    "sc": "float32",
+    "albumin": "float32",
+    "uc": "float32",
+    "ap": "int64",
+    "sgot": "float32",
+    "tgl": "float32",
+    "pl": "float32",
+    "ptb": "float32",
+    "hist-stage": "string"
+}

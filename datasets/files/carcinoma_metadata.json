@@ -1,0 +1,12 @@
+{
+    "status": "int64",
+    "survival": "int64",
+    "sex": "string",
+    "treatment": "string",
+    "grade": "string",
+    "age": "int64",
+    "condition": "string",
+    "site": "string",
+    "t-staging": "string",
+    "n-staging": "string"
+}

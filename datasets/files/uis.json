@@ -1,0 +1,13 @@
+{
+    "time": "int64",
+    "censor": "int64",
+    "age": "int64",
+    "beck": "float32",
+    "hercoc": "string",
+    "ivhx": "string",
+    "ndrugtx": "int64",
+    "race": "string",
+    "treatment": "string",
+    "site": "string",
+    "los": "int64"
+}

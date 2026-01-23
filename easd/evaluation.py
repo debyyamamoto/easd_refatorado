@@ -14,11 +14,11 @@ class RuleEvaluator:
         self._all_indices = set(range(self.dataset_obj.size))
         self.alpha = alpha
         # pré-computar os dados de tempo e eventos
-        self._survivel_times = dataset_obj.survival_times[1]
-        self._events = dataset_obj.events[1]
+        self._survival_times = self.dataset_obj._original_data[self.dataset_obj.surv_name]
+        self._events = self.dataset_obj._original_data[self.dataset_obj._event_name]
         # pré-computar a população complementar
         if comparacao == "complement":
-            all_indices = set(range(len(self.dataset_obj.survival_times[1])))
+            all_indices = set(range(len(self._survival_times)))
             self._complement_cases = list(all_indices - set(self.sub_group_cases))
 
     def get_covered_indices(self, rule, dataset):
@@ -60,7 +60,7 @@ class RuleEvaluator:
         # passo para garantir que
         if self.comparacao == "population":
             try:
-                times = self._survivel_times.to_list()
+                times = self._survival_times.to_list()
                 events = self._events.to_list()
                 group_id = ["sg" if i in set(indices_group_regra) else "pop" for i in range(len(times))]
 
@@ -76,7 +76,7 @@ class RuleEvaluator:
                 cpm = pd.Series("complement", index=indices_complemento_regra)
                 group = pd.concat([sg, cpm], axis=0, ignore_index=False).sort_index()
                 # para ter certeza que group e tempos e eventos compartilham os mesmos indices
-                tempos_filtrados = self._survivel_times.loc[group.index]
+                tempos_filtrados = self._survival_times.loc[group.index]
                 eventos_filtrados = self._events.loc[group.index]
 
                 resultado_p_valor = sm.duration.survdiff(tempos_filtrados, eventos_filtrados, group=group)
@@ -86,6 +86,8 @@ class RuleEvaluator:
             except (ValueError, ZeroDivisionError, Exception) as e:
                 p_value = 1.0
         suporte_relativo = len(indices_group_regra) / len(self._all_indices)
+        if suporte_relativo > 0.55 or suporte_relativo < 0.05:
+            return 0.0  # p=1 => fitness 0
         return (1 - p_value) * (suporte_relativo**self.alpha)
 
     def get_fitness(self, population, dataset_x):

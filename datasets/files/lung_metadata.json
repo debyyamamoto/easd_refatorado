@@ -1,0 +1,12 @@
+{
+    "survival": "int64",
+    "status": "int64",
+    "group": "string",
+    "detec": "string",
+    "cell-type": "string",
+    "stage-1": "string",
+    "stage-2": "string",
+    "stage-3": "string",
+    "stage-4": "string",
+    "op": "string"
+}
