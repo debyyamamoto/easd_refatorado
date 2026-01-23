@@ -11,7 +11,7 @@ import pandas as pd
 from .population import PopulationGenerator
 from .evaluation import RuleEvaluator
 from .operators import GeneticOperators
-from .dataset import Dataset 
+from .dataset import Dataset
 from .visualization import RulesPlotter
 
 EPSILON = 1e-12
@@ -37,7 +37,7 @@ class EASD:
         alpha,
         ksize,
         plot_n_rules: int,
-        coverage_threshold : float = 0.8
+        coverage_threshold: float = 0.8,
     ):
         self.survival_event_col = event_col
         self.survival_time_col = time_col
@@ -65,20 +65,15 @@ class EASD:
         self.coverage_threshold = coverage_threshold
         seed(self.seed)
 
-    def _get_mask(self, rule, dataset_x):
-        col_names = list(self.dataset_obj.attr_values.keys())
-        df = pd.DataFrame(dataset_x, columns=col_names)
-        mask = np.ones(len(df), dtype=bool)
+    def _get_mask(self, rule: list[list]):
+        mask = np.ones(len(self.dataset_obj._original_data), dtype=bool)
         attributes, intervals = rule[0], rule[1]
 
         for attr_idx, interval in zip(attributes, intervals):
-            if isinstance(attr_idx, str):
-                col = attr_idx
-            else:
-                col = col_names[attr_idx]
-            s = df[col]
+            col = self.dataset_obj.get_col_name(attr_idx)
+            s = self.dataset_obj._original_data[col]
 
-            if isinstance(interval[0], str):
+            if self.dataset_obj._original_data[col].dtype == "string":
                 mask &= s.isin(interval)
             else:
                 mask &= (s >= interval[0]) & (s <= interval[1])
@@ -87,18 +82,18 @@ class EASD:
     def _jaccard_test(self, mask1, mask2):
         intersection = np.logical_and(mask1, mask2).sum()
         union = np.logical_or(mask1, mask2).sum()
-        return intersection/union if union > 0.0 else 0.0
+        return intersection / union if union > 0.0 else 0.0
 
     def _overlap_coefficient(self, mask1, mask2):
         intersection = np.logical_and(mask1, mask2)
-        min = min(mask1.sum(), mask2.sum())
-        return intersection/min if min > 0 else 0.0
-        
-    def _is_redundant(self, new_rule, new_fitness, dataset_x):
+        minimum = min(mask1.sum(), mask2.sum())
+        return intersection / minimum if minimum > 0 else 0.0
+
+    def _is_redundant(self, new_rule, new_fitness):
         # caso base: verifica se o grupo de top-k está vazio
         if not self.best_by_key:
-            return False, self._get_mask(new_rule, dataset_x)
-        new_mask = self._get_mask(new_rule, dataset_x)
+            return False, self._get_mask(new_rule)
+        new_mask = self._get_mask(new_rule)
         keys_to_remove = []
 
         for existing_key, (existing_fitness, _, existing_mask) in self.best_by_key.items():
@@ -108,11 +103,11 @@ class EASD:
                     return True, None
                 else:
                     keys_to_remove.append(existing_key)
-        
+
         for i in keys_to_remove:
             del self.best_by_key[i]
 
-        return False, new_mask 
+        return False, new_mask
 
     def _adjust_interval(self, rule, dataset):
         df = pd.DataFrame(dataset)
@@ -248,23 +243,23 @@ class EASD:
 
         return new_population
 
-    def _update_top_k(self, p_population, p_fitness_list, dataset_x):
+    def _update_top_k(self, p_population, p_fitness_list):
         for individual, fitness in zip(p_population, p_fitness_list):
             key = self._rule_key(individual)
 
             if key in self.best_by_key:
                 previous_fit = self.best_by_key[key][0]
                 if fitness > previous_fit + EPSILON:
-                    mask = self._get_mask(individual, dataset_x)
+                    mask = self._get_mask(individual)
                     self.best_by_key[key] = (fitness, individual, mask)
                     heappush(self.top_k_heap, (fitness, key))
                 continue
-            is_redundant, new_mask = self._is_redundant(individual, fitness, dataset_x)
+            is_redundant, new_mask = self._is_redundant(individual, fitness)
             if is_redundant:
                 continue
             if len(self.best_by_key) < self.ksize or (self.top_k_heap and fitness > self.top_k_heap[0][0]):
                 if new_mask is None:
-                    new_mask = self._get_mask(individual, dataset_x)
+                    new_mask = self._get_mask(individual)
                 self._add_rule_to_top_k(key, fitness, individual, new_mask)
 
                 while len(self.best_by_key) > self.ksize:
@@ -321,7 +316,6 @@ class EASD:
         start_time = time.time()
 
         dataset_x = self.dataset_obj.data
-        df_full = pd.DataFrame(dataset_x, columns=list(self.dataset_obj.attr_values.keys()))
 
         mean_fitness_history = []
         best_fitness_history = []
@@ -343,14 +337,14 @@ class EASD:
                 fitness_list = self.evaluation.get_fitness(population, dataset_x)
 
                 population, fitness_list = self.operators.crossover(
-                    population, (self.crossover_rate / 100), fitness_list, dataset_x, df_full
+                    population, (self.crossover_rate / 100), fitness_list, dataset_x
                 )
 
                 population = self.operators.mutation(population, (self.mutation_rate / 100), fitness_list, dataset_x)
 
                 fitness_list = self.evaluation.get_fitness(population, dataset_x)
 
-                self._update_top_k(population, fitness_list, dataset_x)
+                self._update_top_k(population, fitness_list)
 
                 if fitness_list:
                     mean_fit = np.mean(fitness_list)
