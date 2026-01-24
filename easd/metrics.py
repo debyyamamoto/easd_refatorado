@@ -8,7 +8,8 @@ import pandas as pd
 import statsmodels.api as sm
 from autorank import autorank
 from .dataset import Dataset
-
+from rich.console import Console
+console = Console()
 
 ALPHA = 0.05
 STAT_ORDER = "ascending"
@@ -176,17 +177,110 @@ def compute_run_metrics(
 
 
 def output_metrics(p_metrics_list: list, p_file_name: str):
+    """
+    Exporta métricas para CSV.
+    
+    Args:
+        p_metrics_list: Lista de dicionários com métricas (um dict por run/seed)
+        p_file_name: Caminho do arquivo CSV de saída
+        
+    Comportamento:
+    - 0 runs: apenas aviso, não gera arquivo
+    - 1 run: exporta valores diretos
+    - 2+ runs: calcula mean±std, tenta autorank, fallback para stats básicas
+    """
+    # Valida entrada
+    if not p_metrics_list:
+        console.log("Nenhuma métrica para exportar", style="yellow")
+        return
+    
+    # Converte para DataFrame
     metrics_df = pd.DataFrame(p_metrics_list)
-    results_metrics = autorank(metrics_df, alpha=ALPHA, verbose=False, order=STAT_ORDER)
-    if results_metrics is not None:
-        metrics_df = results_metrics.rankdf
+    n_runs = len(metrics_df)
+    n_metrics = len(metrics_df.columns)
+    
+    console.log(f"📊 Exportando {n_runs} run(s) com {n_metrics} métrica(s)", style="blue")
+    
+    # CASO 1: Apenas 1 run - exporta valores diretos
+    if n_runs == 1:
+        metrics_df.to_csv(p_file_name, index=False, float_format='%.4f')
+        console.log(f"✅ Métricas (1 run) → {p_file_name}", style="green")
+        return
+    
+    # CASO 2: Múltiplos runs - tenta usar autorank
+    output_df = None
+    
+    try:
+        results = autorank(
+            metrics_df,
+            alpha=ALPHA,
+            verbose=False,
+            order=STAT_ORDER
+        )
+        
+        if results is not None and hasattr(results, 'rankdf'):
+            ranked_df = results.rankdf
+            
+            # Verifica se tem colunas esperadas
+            required_cols = ['mean', 'std']
+            if all(col in ranked_df.columns for col in required_cols):
+                # Formata: mean±std
+                output_df = pd.DataFrame()
+                output_df['mean±std'] = (
+                    ranked_df['mean'].round(4).astype(str) + 
+                    '±' + 
+                    ranked_df['std'].round(4).astype(str)
+                )
+                
+                # Adiciona meanrank se disponível
+                if 'meanrank' in ranked_df.columns:
+                    output_df['meanrank'] = ranked_df['meanrank'].round(2)
+                
+                output_df.to_csv(p_file_name)
+                console.log(f"Métricas (autorank) → {p_file_name}", style="green")
+                return
+    
+    except Exception as e:
+        console.log(f"Autorank falhou: {str(e)[:50]}...", style="yellow")
+    
+    # CASO 3: Fallback - estatísticas básicas
+    output_df = _compute_basic_statistics(metrics_df)
+    output_df.to_csv(p_file_name, float_format='%.4f')
+    console.log(f"Métricas (básicas) → {p_file_name}", style="green")
 
-    metrics_df = metrics_df[["mean", "std", "meanrank"]].round(2)
-    metrics_df = metrics_df.astype({"mean": "str", "std": "str"})
-    metrics_df.loc[:, "mean"] = metrics_df.loc[:, "mean"].astype(str) + "±" + metrics_df.loc[:, "std"].astype(str)
-    metrics_df = metrics_df[["mean", "meanrank"]]
 
-    metrics_df.to_csv(p_file_name)
+def _compute_basic_statistics(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calcula estatísticas descritivas quando autorank não está disponível.
+    
+    Args:
+        df: DataFrame com runs nas linhas e métricas nas colunas
+        
+    Returns:
+        DataFrame com estatísticas agregadas (uma linha por métrica)
+    """
+    stats_list = []
+    
+    for col in df.columns:
+        values = df[col]
+        
+        mean_val = values.mean()
+        std_val = values.std()
+        
+        stats_list.append({
+            'metric': col,
+            'mean': mean_val,
+            'std': std_val,
+            'mean±std': f"{mean_val:.4f}±{std_val:.4f}",
+            'min': values.min(),
+            'max': values.max(),
+            'median': values.median(),
+        })
+    
+    result_df = pd.DataFrame(stats_list)
+    result_df.set_index('metric', inplace=True)
+    
+    return result_df
 
 
 def _is_number(x: Any) -> bool:

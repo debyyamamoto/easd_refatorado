@@ -100,6 +100,9 @@ class Dataset:
     def get_uncovered_cases(self):
         return list(self._original_data[self._uncovered_cases].index)
 
-    def get_instances(self):
+    def get_instances(self) -> list:
         """ """
-        return list(range(len(self.data)))
+        if self.data is not None:
+            return list(range(len(self.data)))
+        else:
+            return []
