@@ -252,12 +252,13 @@ class EASD:
                 if fitness > previous_fit + EPSILON:
                     mask = self._get_mask(individual)
                     self.best_by_key[key] = (fitness, individual, mask)
+                    self.top_k_heap.remove((previous_fit, key))
                     heappush(self.top_k_heap, (fitness, key))
                 continue
             is_redundant, new_mask = self._is_redundant(individual, fitness)
             if is_redundant:
                 continue
-            if len(self.best_by_key) < self.ksize or (self.top_k_heap and fitness > self.top_k_heap[0][0]):
+            if len(self.best_by_key) < self.ksize or (self.top_k_heap and fitness > self.top_k_heap[0][0] + EPSILON):
                 if new_mask is None:
                     new_mask = self._get_mask(individual)
                 self._add_rule_to_top_k(key, fitness, individual, new_mask)
@@ -270,7 +271,7 @@ class EASD:
                     if worst_key in self.best_by_key:
                         del self.best_by_key[worst_key]
 
-        if len(self.top_k_heap) >= 2 * len(self.best_by_key):
+        if len(self.top_k_heap) > len(self.best_by_key):
             self._rebuild_heap_from_topk()
 
     def _update_current_rule(self, p_rule, p_previous, p_individual, p_fitness):
