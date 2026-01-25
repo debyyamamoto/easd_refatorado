@@ -1,7 +1,7 @@
 import pandas as pd
 import random as rd
 import copy
-import numpy as np
+
 
 class GeneticOperators:
     def __init__(self, evaluator, get_best_func):
@@ -22,7 +22,7 @@ class GeneticOperators:
         elif mutation_option == 2:
             new_interval.append(interval[0] - amplitude)
             new_interval.append(interval[1] - amplitude)
-        # aumentar o limite à direita e diminuir o da esquerda 
+        # aumentar o limite à direita e diminuir o da esquerda
         elif mutation_option == 3:
             new_interval.append(interval[0] - amplitude)
             new_interval.append(interval[1] + amplitude)
@@ -46,17 +46,17 @@ class GeneticOperators:
         elif mutation_option == 8:
             new_interval.append(interval[0])
             new_interval.append(interval[1] - amplitude)
-        # remover o atributo da regra 
+        # remover o atributo da regra
         elif mutation_option == 9:
             new_interval = []
-            
+
         return new_interval
 
     def to_mutate_discrete(self, discrete_atr, attribute_domain, mutation_option):
         new_discrete = []
         """
         Função que faz a mutação de atributos categóricos
-        """        
+        """
         # 2artigo - adição de um valor aleatório à lista de valores aceitos para aquele atributo
         if mutation_option == 1:
             for i in range(len(discrete_atr)):
@@ -94,7 +94,7 @@ class GeneticOperators:
     def mutation(self, population, prct, fitness_list, dataset):
         df = pd.DataFrame(dataset)
         mutated_population = copy.deepcopy(population)
-        
+
         for mutations in range(len(mutated_population)):
             pm = rd.randint(1, 100)
             if pm <= (prct * 100):
@@ -105,15 +105,15 @@ class GeneticOperators:
                         mutated_population.remove(rule)
                     else:
                         break
-                # elitismo - proteção do melhor individuo 
+                # elitismo - proteção do melhor individuo
                 if rd_index != self._get_best(mutated_population, fitness_list):
-                    # se a regra tiver só um atributo -> ele vai ser alterado 
+                    # se a regra tiver só um atributo -> ele vai ser alterado
                     if len(rule[0]) == 1:
                         atr_qtd = 1
                     # caso contrário, a quantidade é sorteada
                     else:
                         atr_qtd = rd.randint(1, len(rule[0]))
-                    
+
                     selected_for_mutation = []
                     for i in range(atr_qtd):
                         while True:
@@ -121,7 +121,7 @@ class GeneticOperators:
                             if atr not in selected_for_mutation:
                                 selected_for_mutation.append(atr)
                                 break
-                    
+
                     cnt = 0
                     # escolhe o tipo de mutação conforme
                     size_check = len(rule[0])
@@ -129,30 +129,34 @@ class GeneticOperators:
                         if size_check > 1:
                             index = selected_for_mutation[cnt]
                             col_index = rule[0][index]
-                            
+
                             if type(rule[1][index][0]) == str:
                                 mutation_option = rd.randint(1, 3)
-                                rule[1][index] = self.to_mutate_discrete(rule[1][index], df[col_index].values.tolist(), mutation_option)
+                                rule[1][index] = self.to_mutate_discrete(
+                                    rule[1][index], df[col_index].values.tolist(), mutation_option
+                                )
                             else:
                                 mutation_option = rd.randint(1, 9)
                                 rule[1][index] = self.to_mutate_continuous(rule[1][index], 0.1, mutation_option)
                         else:
                             index = selected_for_mutation[cnt]
                             col_index = rule[0][index]
-                            
+
                             if type(rule[1][index][0]) == str:
                                 mutation_option = rd.randint(1, 2)
-                                rule[1][index] = self.to_mutate_discrete(rule[1][index], df[col_index].values.tolist(), mutation_option)
+                                rule[1][index] = self.to_mutate_discrete(
+                                    rule[1][index], df[col_index].values.tolist(), mutation_option
+                                )
                             else:
                                 mutation_option = rd.randint(1, 8)
                                 rule[1][index] = self.to_mutate_continuous(rule[1][index], 0.1, mutation_option)
-                        
+
                         for i in range(len(rule[0])):
                             if len(rule[1][i]) == 0:
                                 size_check -= 1
-                        
+
                         cnt += 1
-                    
+
                     cols_rm = []
                     to_remove = []
                     for i in range(len(rule[0])):
@@ -164,7 +168,7 @@ class GeneticOperators:
                         idx = rule[0].index(cols_rm[rm])
                         rule[0].remove(rule[0][idx])
                         rule[1].remove(rule[1][idx])
-        
+
         return mutated_population
 
     def crossover1(self, parent1, parent2):
@@ -181,7 +185,7 @@ class GeneticOperators:
             if type(parent1[1][0][0]) == str:
                 offspring = parent2
                 idx = parent2[0].index(parent1[0][0])
-                offspring[1][idx] = (parent1[1][0])
+                offspring[1][idx] = parent1[1][0]
             else:
                 offspring = parent2
                 idx = parent2[0].index(parent1[0][0])
@@ -205,7 +209,7 @@ class GeneticOperators:
             offspring2[0].append(parent2[0][i])
             offspring1[1].append(parent1[1][i])
             offspring2[1].append(parent2[1][i])
-        
+
         for i in range(point, len(parent1[0])):
             if parent1[0][i] not in offspring2[0]:
                 offspring2[0].append(parent1[0][i])
@@ -228,16 +232,16 @@ class GeneticOperators:
 
         return offspring1, offspring2
 
-    def check_subst(self, population, dataset_x, parents_index, offsprings, fitness_list, df):
+    def check_subst(self, population, dataset_x, parents_index, offsprings, fitness_list):
         """
-        Substituir indivíduos da população atual por filhos (offsprints) gerados, baseados na qualidade de cada um 
+        Substituir indivíduos da população atual por filhos (offsprints) gerados, baseados na qualidade de cada um
         """
         p_fit = []
         offs_fit = []
-        
+
         for offspring in offsprings:
             offs_fit.append(self.evaluator.fitness(offspring, dataset_x))
-        
+
         final_offs_fit = list(offs_fit)
 
         for i in range(len(parents_index)):
@@ -254,12 +258,12 @@ class GeneticOperators:
             max_idx_parent = p_fit.index(max(p_fit))
             min_idx_parent = p_fit.index(min(p_fit))
             submax_check_fail = True
-        
+
             if final_offs_fit[max_index_off] > fitness_list[parents_index[max_idx_parent]]:
                 population[parents_index[max_idx_parent]] = offsprings[max_index_off]
                 fitness_list[parents_index[max_idx_parent]] = final_offs_fit[max_index_off]
                 submax_check_fail = False
-            
+
             if submax_check_fail:
                 if final_offs_fit[max_index_off] > fitness_list[parents_index[min_idx_parent]]:
                     population[parents_index[min_idx_parent]] = offsprings[max_index_off]
@@ -268,10 +272,10 @@ class GeneticOperators:
                 if final_offs_fit[min_index_off] > fitness_list[parents_index[min_idx_parent]]:
                     population[parents_index[min_idx_parent]] = offsprings[min_index_off]
                     fitness_list[parents_index[min_idx_parent]] = final_offs_fit[min_index_off]
-                    
+
         return population, fitness_list
 
-    def crossover(self, population, prct, fitness_list, dataset_x, df_full):
+    def crossover(self, population, prct, fitness_list, dataset_x):
         for i in range(len(population)):
             pm = rd.randint(1, 100)
             if pm <= (prct * 100):
@@ -280,16 +284,18 @@ class GeneticOperators:
                     p2 = rd.randint(0, len(population) - 1)
                     if p2 != p1:
                         break
-                
+
                 parents_index = [p1, p2]
-                # seleciona dois pais 
+                # seleciona dois pais
                 parent1 = copy.deepcopy(population[p1])
                 parent2 = copy.deepcopy(population[p2])
                 # verifica se ambos os pais tem tamanho maior que 1
                 if min(len(parent1[0]), len(parent2[0])) > 1:
                     offspring1, offspring2 = self.single_point_crossover(parent1, parent2)
-                    population, fitness_list = self.check_subst(population, dataset_x, parents_index, [offspring1, offspring2], fitness_list, df_full)
-                # verifica se pelo menos um dos pais tem tamanho 1 
+                    population, fitness_list = self.check_subst(
+                        population, dataset_x, parents_index, [offspring1, offspring2], fitness_list
+                    )
+                # verifica se pelo menos um dos pais tem tamanho 1
                 else:
                     # ambos tem tamanho igual a 1 e tem os mesmo atributos
                     if (len(parent1[0]) == len(parent2[0])) and (parent1[0] == parent2[0]):
@@ -298,10 +304,14 @@ class GeneticOperators:
                         # se o pai 1 tem tamanho == 1
                         if len(parent1[0]) == 1:
                             offspring = self.crossover1(parent1, parent2)
-                            population, fitness_list = self.check_subst(population, dataset_x, parents_index, [offspring], fitness_list, df_full)
+                            population, fitness_list = self.check_subst(
+                                population, dataset_x, parents_index, [offspring], fitness_list
+                            )
                         # se pai 2 tem tamanho igual a 1
                         else:
                             offspring = self.crossover1(parent2, parent1)
-                            population, fitness_list = self.check_subst(population, dataset_x, parents_index, [offspring], fitness_list, df_full)
+                            population, fitness_list = self.check_subst(
+                                population, dataset_x, parents_index, [offspring], fitness_list
+                            )
 
         return population, fitness_list
