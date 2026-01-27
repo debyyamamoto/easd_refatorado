@@ -77,7 +77,8 @@ class EASD:
                 mask &= s.isin(interval)
             else:
                 mask &= (s >= interval[0]) & (s <= interval[1])
-        return mask
+
+        return list(mask)
 
     def _jaccard_test(self, mask1, mask2):
         intersection = np.logical_and(mask1, mask2).sum()

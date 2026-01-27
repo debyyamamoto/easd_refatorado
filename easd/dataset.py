@@ -85,7 +85,7 @@ class Dataset:
     def get_col_index(self, col_name):
         return self._col_index[col_name]
 
-    def get_col_name(self, col_index):
+    def get_col_name(self, col_index) -> str:
         return self._map_rules_columns[col_index]
 
     def get_data(self) -> pd.DataFrame:
