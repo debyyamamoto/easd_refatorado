@@ -1,0 +1,11 @@
+Rule_Obj,Rule_Score
+"[['cell-type'], [['small', 'adeno']]]",0.9415291077006068
+"[['cell-type', 'treat'], [['small', 'adeno'], ['test', 'standard']]]",0.9415291077006068
+"[['pt', 'cell-type'], [['no', 'yes'], ['small', 'adeno']]]",0.9415291077006068
+"[['pt', 'cell-type', 'treat'], [['no', 'yes'], ['adeno', 'small'], ['test', 'standard']]]",0.9415291077006068
+"[['karno'], [[30, 70]]]",0.9354767255672446
+"[['cell-type', 'karno'], [['large', 'small', 'adeno', 'aquamous'], [30, 60]]]",0.9354767255672446
+"[['treat', 'karno'], [['test', 'standard'], [20, 60]]]",0.9354767255672446
+"[['cell-type', 'karno', 'treat'], [['large', 'adeno', 'small'], [10, 60], ['standard', 'test']]]",0.9222754510250059
+"[['pt', 'karno'], [['yes', 'no'], [60, 99]]]",0.9176304427273186
+"[['pt', 'karno', 'cell-type'], [['no', 'yes'], [70, 99], ['adeno', 'small', 'aquamous', 'large']]]",0.9176304427273186

@@ -81,10 +81,12 @@ def run_main(args: Namespace):
         ).as_dict()
         metrics_list.append(run_metrics)
 
-        _save_results(detailed_rules, tmp, float(mean_rule_size), run, info, run_metrics, output_dir_dataset)
+        _save_results(
+            detailed_rules, tmp, float(mean_rule_size), run, info, run_metrics, output_dir_dataset, args.comparacao
+        )
 
     if num_executions > 1:
-        _save_stats(output_dir_dataset, metrics_list)
+        _save_stats(output_dir_dataset, metrics_list, args.comparacao)
 
     for i, figure in enumerate(figures_list):
         if i == 0:
@@ -101,28 +103,29 @@ def _save_results(
     p_info: pd.DataFrame,
     p_metrics: dict,
     p_output_dir_dataset: str,
+    p_baseline: str,
 ):
     scores_list.append(p_detailed_rules["Rule_Score"].values)
     runtime_list.append(round(p_runtime, 2))
     mean_rule_size_list.append(p_mean_rule_size)
 
-    csv_filename_detailed = f"{dataset_name}_{p_run}_DetailedRules.csv"
+    csv_filename_detailed = f"{dataset_name}_{p_run}_{p_baseline}_DetailedRules.csv"
     csv_path_detailed = os.path.join(p_output_dir_dataset, csv_filename_detailed)
     p_detailed_rules.to_csv(csv_path_detailed, sep=",", index=False)
 
-    csv_filename_info = f"{dataset_name}_{p_run}_Info.csv"
+    csv_filename_info = f"{dataset_name}_{p_run}_{p_baseline}_Info.csv"
     csv_path_info = os.path.join(p_output_dir_dataset, csv_filename_info)
     p_info.to_csv(csv_path_info, sep=",", index=False)
 
-    metrics_filename = f"{dataset_name}_{p_run}_RulesMetricsResult.csv"
+    metrics_filename = f"{dataset_name}_{p_run}_{p_baseline}_RulesMetricsResult.csv"
     metrics_filename = os.path.join(p_output_dir_dataset, metrics_filename)
     metrics_df = pd.DataFrame([p_metrics]).round(2)
     metrics_df.to_csv(metrics_filename, index=False, float_format="%.4f")
 
 
-def _save_stats(p_output_dir_dataset: str, p_metrics_list: list[dict]):
-    stats_filename = f"{dataset_name}_RulesStatsResult.csv"
-    metrics_filename = f"{dataset_name}_RulesMetricsResult.csv"
+def _save_stats(p_output_dir_dataset: str, p_metrics_list: list[dict], p_baseline: str):
+    stats_filename = f"{dataset_name}_{p_baseline}_RulesStatsResult.csv"
+    metrics_filename = f"{dataset_name}_{p_baseline}_RulesMetricsResult.csv"
     stats_path = os.path.join(p_output_dir_dataset, stats_filename)
     metrics_path = os.path.join(p_output_dir_dataset, metrics_filename)
     stats_data = {
