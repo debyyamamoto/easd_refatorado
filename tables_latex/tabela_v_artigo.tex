@@ -1,0 +1,35 @@
+\begin{table}[!t]
+\centering
+\caption{Resumo do teste de Wilcoxon ($\alpha=0.05$) entre o Algoritmo e o Baseline.}
+\label{tab:wilcoxon_summary}
+\scriptsize
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.2}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lllc}
+\toprule
+\textbf{Dataset} & \textbf{Metric} & \textbf{Best mean} & \textbf{p-value} \\
+\midrule
+\textit{breast-cancer} & exceptionality & empate & 1.0000 \\
+ & length & EsmamDS-cpm & \textbf{0.0001} \\
+ & sgCov & Algoritmo & \textbf{0.0000} \\
+ & description redundancy & EsmamDS-cpm & \textbf{0.0000} \\
+\midrule
+\textit{cancer} & exceptionality & EsmamDS-cpm & \textbf{0.0000} \\
+ & length & EsmamDS-cpm & \textbf{0.0000} \\
+ & sgCov & Algoritmo & \textbf{0.0000} \\
+ & description redundancy & empate & 0.8774 \\
+\midrule
+\textit{carcinoma} & exceptionality & empate & 1.0000 \\
+ & length & EsmamDS-cpm & \textbf{0.0000} \\
+ & sgCov & Algoritmo & \textbf{0.0000} \\
+ & description redundancy & EsmamDS-cpm & \textbf{0.0000} \\
+\midrule
+\textit{mgus2} & exceptionality & empate & 1.0000 \\
+ & length & EsmamDS-cpm & \textbf{0.0000} \\
+ & sgCov & Algoritmo & \textbf{0.0000} \\
+ & description redundancy & EsmamDS-cpm & \textbf{0.0000} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}

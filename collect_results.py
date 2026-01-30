@@ -56,7 +56,7 @@ def compilar_dados(caminho_base, datasets, num_execucoes=30):
                 print(f"  Erro em {dataset} exec {i}: {e}")
     
     df = pd.DataFrame(todos_dados)
-    df.to_csv('resultados.csv', index=False)
+    df.to_csv('results/resultados.csv', index=False)
     print(f" CSV salvo: resultados.csv")
     print(f"  Total de linhas: {len(df)}")
     
@@ -64,5 +64,5 @@ def compilar_dados(caminho_base, datasets, num_execucoes=30):
 
 if __name__ == "__main__":
     CAMINHO = 'results'
-    DATASETS = ['carcinoma', 'breast-cancer', 'cancer', 'carcinoma', 'lung', 'mgus2']
+    DATASETS = ['breast-cancer', 'cancer', 'carcinoma', 'mgus2']
     compilar_dados(CAMINHO, DATASETS)
