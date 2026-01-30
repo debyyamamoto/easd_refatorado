@@ -1,0 +1,70 @@
+import numpy as np
+import pandas as pd
+import sys
+import os
+from pathlib import Path
+
+# 1. Reunir resultados das 30 execuções de cada dataset
+METRICAS = [
+    "exceptionality",
+    "#sg",
+    "length",
+    "sgCov",
+    "setCov",
+    "description redundancy",
+    "coverage redundancy",
+    "CR",
+    "model redundancy",
+]
+
+ALGORITMOS_BASELINE = ["EsmamDS-cpm", "Esmam-cpm", "BS-EMM-cpm", "BS-SD-cpm", "LR-Rules"]
+
+
+def compilar_dados(caminho_base, datasets, num_execucoes=30, p_baseline="population"):
+    todos_dados = []
+
+    for dataset in datasets:
+        for i in range(num_execucoes):
+            caminho = f"{caminho_base}/{dataset}/{p_baseline}/{dataset}_{i}_{p_baseline}_{"RulesMetricsResult.csv"}"
+
+            if not os.path.exists(caminho):
+                print(f"Caminho não encontrado!, {caminho}")
+
+                continue
+            try:
+                with open(caminho, "r") as f:
+                    linhas = f.readlines()
+                    linha_dados = linhas[-1].strip()
+                    valores = linha_dados.split(",")
+
+                    if len(valores) == len(METRICAS):
+                        dados_linha = {"Dataset": dataset, "Execucao": i}
+
+                        for metrica, valor in zip(METRICAS, valores):
+                            dados_linha[metrica] = float(valor)
+
+                        todos_dados.append(dados_linha)
+            except Exception as e:
+                print(f"  Erro em {dataset} exec {i}: {e}")
+
+    df = pd.DataFrame(todos_dados)
+    df.to_csv(f"resultados_{p_baseline}.csv", index=False)
+    print(f" CSV salvo: resultados.csv")
+    print(f"  Total de linhas: {len(df)}")
+
+    return df
+
+
+if __name__ == "__main__":
+    CAMINHO = "results"
+    DATASETS = ["carcinoma", "breast-cancer", "cancer", "carcinoma", "lung", "mgus2"]
+    baselline = int(
+        input(
+            "Selecione qual baseline para compilar os resultados:\n[1] População\n[2] Complemento\nEscolha: "
+        ).strip()
+    )
+    if baselline == 1:
+        baselline = "population"
+    else:
+        baselline = "complement"
+    compilar_dados(CAMINHO, DATASETS, p_baseline=baselline)
