@@ -13,53 +13,53 @@ import psutil
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Estrutura de resultado
+# Result structure
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 @dataclass
 class ResourceSummary:
-    # CPU (amostrado por thread em background — mesmo comportamento anterior)
+    # CPU sampled by a background thread, preserving the previous behavior.
     cpu_mean_percent: float
     cpu_peak_percent: float
-    # RAM absoluta (RSS total do processo, mesmo comportamento anterior)
+    # Absolute RAM, total process RSS, preserving the previous behavior.
     ram_mean_mb: float
     ram_peak_mb: float
-    # RAM incremental: pico de RSS durante o loop - RSS antes do loop.
-    # Isola a memória alocada pelo algoritmo sem o footprint estático do Python.
+    # Incremental RAM: peak RSS during the loop minus RSS before the loop.
+    # Isolates memory allocated by the algorithm without Python's static footprint.
     ram_incremental_peak_mb: float
     ram_baseline_mb: float
     samples: int
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Monitor de recursos (CPU + RAM) — sem overhead de instrumentação
+# Resource monitor (CPU + RAM), with no instrumentation overhead
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 class ProcessResourceMonitor:
     """
-    Monitora CPU e RAM de um processo em uma thread separada.
+    Monitors CPU and RAM for a process in a separate thread.
 
-    RAM é reportada de duas formas:
-      - Absoluta (ram_mean_mb, ram_peak_mb): RSS total do processo,
-        inclui o footprint estático do Python (~200 MB). Mantida para
-        compatibilidade com os resultados anteriores.
-      - Incremental (ram_incremental_peak_mb): pico de RSS durante o
-        loop menos o baseline medido em start(). Isola a memória
-        alocada pelo algoritmo sem overhead de instrumentação e sem
-        o ruído do footprint estático do interpretador.
+    RAM is reported in two ways:
+      - Absolute (ram_mean_mb, ram_peak_mb): total process RSS, including
+        Python's static footprint (~200 MB). Kept for compatibility with
+        previous results.
+      - Incremental (ram_incremental_peak_mb): peak RSS during the loop minus
+        the baseline measured in start(). This isolates memory allocated by
+        the algorithm without instrumentation overhead and without interpreter
+        footprint noise.
 
-    Não usa tracemalloc nem cProfile — overhead próximo de zero.
+    Does not use tracemalloc or cProfile, keeping overhead close to zero.
 
     Parameters
     ----------
     pid : int | None
-        PID do processo a monitorar. None usa o processo atual.
+        PID of the process to monitor. None uses the current process.
     interval : float
-        Intervalo entre amostras em segundos.
+        Sampling interval, in seconds.
     include_children : bool
-        Se True, inclui processos filhos (workers de numpy/BLAS).
+        If True, include child processes such as numpy/BLAS workers.
     """
 
     def __init__(
@@ -76,17 +76,17 @@ class ProcessResourceMonitor:
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
 
-        # Welford — CPU
+        # Welford, CPU.
         self._cpu_n: int = 0
         self._cpu_mean: float = 0.0
         self._cpu_peak: float = 0.0
 
-        # Welford — RAM absoluta
+        # Welford, absolute RAM.
         self._ram_n: int = 0
         self._ram_mean: float = 0.0
         self._ram_peak: float = 0.0
 
-        # RAM incremental — apenas dois floats, sem listas
+        # Incremental RAM, only two floats and no lists.
         self._ram_baseline_mb: float = 0.0
         self._ram_incremental_peak_mb: float = 0.0
 
@@ -146,7 +146,7 @@ class ProcessResourceMonitor:
     # ── loop de amostragem ───────────────────────────────────────────────────
 
     def _sample_loop(self) -> None:
-        # warm-up: primeira leitura de cpu_percent é sempre 0.0
+        # Warm-up: the first cpu_percent read is always 0.0.
         try:
             self._process.cpu_percent(interval=None)
             if self.include_children:
@@ -167,13 +167,12 @@ class ProcessResourceMonitor:
 
     def start(self) -> None:
         """
-        Inicia o monitoramento.
+        Starts monitoring.
 
-        Chame imediatamente antes do loop evolutivo, após toda
-        inicialização (Dataset, população inicial, etc.) estar concluída.
-        O baseline de RAM é medido aqui, após um gc.collect() para
-        garantir que objetos pendentes de gerações anteriores não
-        contaminem a referência.
+        Call immediately before the evolutionary loop, after initialization
+        (Dataset, initial population, etc.) has completed. The RAM baseline is
+        measured here after gc.collect() so pending objects from previous
+        generations do not contaminate the reference.
         """
         gc.collect()
         self._ram_baseline_mb = self._get_rss_mb()
@@ -183,7 +182,7 @@ class ProcessResourceMonitor:
         self._thread.start()
 
     def stop(self) -> ResourceSummary:
-        """Para o monitoramento e retorna o resumo das métricas."""
+        """Stops monitoring and returns the metric summary."""
         self._stop_event.set()
         if self._thread is not None:
             self._thread.join()
@@ -212,7 +211,7 @@ class ProcessResourceMonitor:
         )
 
     def get_current_snapshot(self) -> Dict[str, float]:
-        """Leitura pontual sem interromper o monitor. Útil para logging por geração."""
+        """Point-in-time read without stopping the monitor. Useful for per-generation logging."""
         num_cpus = psutil.cpu_count(logical=True) or 1
         return {
             "cpu_mean_so_far": self._cpu_mean / num_cpus,
@@ -226,28 +225,28 @@ class ProcessResourceMonitor:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Profiler de CPU por função (cProfile) — use em execuções separadas
+# Per-function CPU profiler (cProfile). Use in separate executions.
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 class CPUProfiler:
     """
-    Wrapper de cProfile para identificar gargalos por função.
+    cProfile wrapper for identifying per-function bottlenecks.
 
-    Adiciona ~10-20% de overhead no runtime — use em execuções separadas
-    com seed fixa para análise, não nas 30 execuções do benchmark.
+    Adds ~10-20% runtime overhead. Use in separate executions with a fixed
+    seed for analysis, not in the 30 benchmark executions.
 
-    Alternativa sem modificar o código (linha de comando):
+    Alternative without modifying the code from the command line:
         python -m cProfile -o result.prof main.py <args> --seed 42
         python -c "import pstats; pstats.Stats('result.prof').sort_stats('cumulative').print_stats(20)"
 
-    Uso programático dentro do loop em core.py:
+    Programmatic usage inside the loop in core.py:
         profiler = CPUProfiler()
         profiler.start()
         while self._check_stop(gen_count):
             ...
         profiler.stop_and_print(n_top=15, sort_by="cumulative")
-        profiler.save("easd.prof")  # snakeviz easd.prof para visualização
+        profiler.save("easd.prof")  # snakeviz easd.prof for visualization
     """
 
     def __init__(self):
@@ -262,15 +261,15 @@ class CPUProfiler:
 
     def stop_and_print(self, n_top: int = 20, sort_by: str = "cumulative") -> None:
         """
-        Para e imprime as n_top funções mais custosas.
+        Stops and prints the n_top most expensive functions.
 
-        sort_by úteis:
-          "cumulative" — tempo total incluindo subchamadas.
-                         Bom para ver qual parte do código domina o runtime.
-          "tottime"    — tempo dentro da função, excluindo subchamadas.
-                         Bom para identificar a função específica mais lenta.
-          "ncalls"     — número de chamadas.
-                         Bom para detectar chamadas repetidas desnecessariamente.
+        Useful sort_by values:
+          "cumulative" -- total time including subcalls. Good for seeing which
+                          part of the code dominates runtime.
+          "tottime"    -- time inside the function, excluding subcalls. Good
+                          for identifying the specific slowest function.
+          "ncalls"     -- number of calls. Good for detecting unnecessary
+                          repeated calls.
         """
         self._pr.disable()
         stream = io.StringIO()
@@ -281,8 +280,8 @@ class CPUProfiler:
 
     def save(self, filepath: str) -> None:
         """
-        Salva o perfil em arquivo .prof para visualização com snakeviz:
+        Saves the profile to a .prof file for visualization with snakeviz:
             pip install snakeviz && snakeviz <filepath>
         """
         self._pr.dump_stats(filepath)
-        print(f"Perfil salvo em: {filepath}")
+        print(f"Profile saved to: {filepath}")

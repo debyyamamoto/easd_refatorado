@@ -55,7 +55,7 @@ The fixed paper script uses:
 - Baselines: `complement`, `population`.
 - Executions: `30`.
 - Parameters: `generations=500`, `population=500`, `restart_gen=5`,
-  `restart_pop=5`, `restart_pct=10`, `alpha=0.20`, `ksize=10`,
+  `restart_pop=5`, `restart_pct=10`, `alpha=0.10`, `ksize=10`,
   `threshold=0.9`.
 
 Update this section whenever the article protocol changes.

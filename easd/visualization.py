@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 import pandas as pd
 import pandas.api.types as ptypes
-import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
@@ -22,9 +21,9 @@ class RulesPlotter:
 
     def kaplan_meier(self, num_top: int) -> list[Figure]:
         """
-        Realiza o plot de Kaplan-Meier das regras registradas no Top-K
+        Plots Kaplan-Meier curves for the rules registered in the Top-K.
 
-        :param num_top: Números de regras que serão mostradas no plot de top-n melhores subgrupos registrados no top-k (Ex: num_top=3, compara as 3 melhores regras com a população/complemento)
+        :param num_top: Number of rules shown in the top-n plot.
         :type num_top: int
         """
         if num_top > 0:
@@ -130,17 +129,3 @@ class RulesPlotter:
         fitter = KaplanMeierFitter(label=rule_string)
         fitter.fit(rule_df[self.time_column], rule_df[self.events_column])
         fitter.plot_survival_function(ax=p_ax)
-
-
-if __name__ == "__main__":
-    df = pd.read_parquet("datasets/cancer.parquet")
-    rules = [
-        [["ph-ecog"], [["3.0", "0.0"]]],
-        [["age", "sex"], [[np.float64(54.0), np.float64(82.0)], ["1", "2"]]],
-    ]
-
-    plotter = RulesPlotter(df, rules, events_column="status", time_column="time")
-    plot_list = plotter.kaplan_meier(2)
-    for i, plot in enumerate(plot_list):
-        plot.show()
-        plot.savefig(f"image{i}")

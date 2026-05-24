@@ -3,7 +3,6 @@ import time
 import math
 import copy
 from random import seed
-from typing import List, Tuple, Any
 from heapq import heapify, heappush, heappop
 from rich.console import Console
 import numpy as np
@@ -95,7 +94,7 @@ class MEASE:
         return intersection / minimum if minimum > 0 else 0.0
 
     def _is_redundant(self, new_rule, new_fitness):
-        # caso base: verifica se o grupo de top-k está vazio
+        # Base case: the top-k group is empty.
         if not self.best_by_key:
             return False, self._get_mask(new_rule)
         new_mask = self._get_mask(new_rule)
@@ -186,7 +185,7 @@ class MEASE:
         if self.restart_counter_consecutive >= self.max_pop_restarts:
             print(f"\n{'='*70}")
             console.log(
-                f"  Critério de parada com {self.max_pop_restarts} reinicializações alcançado.",
+                f"  Stop criterion reached after {self.max_pop_restarts} population restarts.",
                 style="bold green",
             )
             print(f"\n{'='*70}")
@@ -281,7 +280,7 @@ class MEASE:
 
     def _update_current_rule(self, p_rule, p_previous, p_individual, p_fitness):
         """
-        Atualiza uma regra que os atributos já estão na lista de top-ks se os invervalos conferem um fitness melhor
+        Updates an existing top-k rule when its intervals improve the fitness.
         """
         previous_fit, _ = p_previous
         if p_fitness > previous_fit + EPSILON:
@@ -330,19 +329,19 @@ class MEASE:
         mean_fitness_history = []
         best_fitness_history = []
         print(f"\n{'='*70}")
-        console.print(f"--- Iniciando Busca Top-K ---")
+        console.print("--- Starting Top-K Search ---")
         print(f"\n{'='*70}")
-        console.print(f"Configuração:")
-        console.print(f"   • População: {self.population_size}")
-        console.print(f"   • Gerações: {self.max_generations}")
-        console.print(f"   • Top-K: {self.ksize} melhores regras")
+        console.print("Configuration:")
+        console.print(f"   - Population: {self.population_size}")
+        console.print(f"   - Generations: {self.max_generations}")
+        console.print(f"   - Top-K: {self.ksize} best rules")
         print(f"{'='*70}")
 
         gen_count = 0
         population = self.generator.gen_population(self.population_size, dataset_x)
         gen_mean_fitness, gen_best_fitness = [], []
 
-        with console.status("[bold green] Evoluindo gerações...") as status:
+        with console.status("[bold green] Evolving generations...") as status:
             while self._check_stop(gen_count):
                 fitness_list = self.evaluation.get_fitness(population, dataset_x)
 
@@ -363,12 +362,12 @@ class MEASE:
                     gen_best_fitness.append(best_fit)
                     if (gen_count + 1) % 50 == 0:
                         console.log(
-                            f"   Gen {gen_count + 1:3d}: Melhor={best_fit:.4f} | "
-                            f"Média={mean_fit:.4f} | Top-K={len(self.best_by_key)}/{self.ksize}"
+                            f"   Gen {gen_count + 1:3d}: Best={best_fit:.4f} | "
+                            f"Mean={mean_fit:.4f} | Top-K={len(self.best_by_key)}/{self.ksize}"
                         )
                 else:
                     console.print(
-                        f"⚠️ AVISO G{gen_count}: População vazia - Encerrando execução.",
+                        f"WARNING G{gen_count}: empty population - stopping execution.",
                         style="bold red",
                     )
                     break
@@ -387,14 +386,14 @@ class MEASE:
             if gen_best_fitness:
                 final_best = gen_best_fitness[-1]
                 console.log(
-                    f"   ✓ Concluída: {gen_count} gerações | " f"Melhor Fitness Final = {final_best:.4f}\n",
+                    f"   Completed: {gen_count} generations | Final Best Fitness = {final_best:.4f}\n",
                     style="bold green",
                 )
         print(f"\n{'='*70}")
-        console.log(f" Finalizou em {time.time() - start_time:.2f} s", style="bold green")
+        console.log(f" Finished in {time.time() - start_time:.2f} s", style="bold green")
         print(f"{'='*70}")
 
-        top_k_values = list(self.best_by_key.values())  # Lista de tuplas (fitness, regra)
+        top_k_values = list(self.best_by_key.values())  # List of tuples (fitness, rule).
 
         if top_k_values:
             fitnesses = [v[0] for v in top_k_values]
@@ -402,12 +401,12 @@ class MEASE:
             best_fit = np.max(fitnesses)
             worst_fit = np.min(fitnesses)
             std_fit = np.std(fitnesses)
-            console.print(f"\n Estatísticas das Top-{len(top_k_values)} Regras:")
-            console.print(f"   • Média Fitness: {avg_fit:.4f} (±{std_fit:.4f})")
-            console.print(f"   • Melhor: {best_fit:.4f}")
-            console.print(f"   • Pior: {worst_fit:.4f}")
+            console.print(f"\n Top-{len(top_k_values)} Rule Statistics:")
+            console.print(f"   - Mean Fitness: {avg_fit:.4f} (+/-{std_fit:.4f})")
+            console.print(f"   - Best: {best_fit:.4f}")
+            console.print(f"   - Worst: {worst_fit:.4f}")
         else:
-            console.log("\n Nenhuma regra válida encontrada!", style="bold red")
+            console.log("\n No valid rules found.", style="bold red")
             avg_fit, best_fit, worst_fit, std_fit = 0.0, 0.0, 0.0, 0.0
 
         final_metrics = [avg_fit, best_fit, worst_fit, std_fit]
@@ -426,24 +425,24 @@ class MEASE:
         total_time = time.time() - start_time
         rules_qtd = len(final_rules_found)
         mean_size = np.mean(rules_sizes) if rules_sizes else 0.0
-        console.print(f"\n Resultados Finais:")
-        console.print(f"   • Regras encontradas: {rules_qtd}")
-        console.print(f"   • Tamanho médio: {mean_size:.2f} atributos")
+        console.print("\n Final Results:")
+        console.print(f"   - Rules found: {rules_qtd}")
+        console.print(f"   - Mean size: {mean_size:.2f} attributes")
         print(f"{'='*70}\n")
         detailed_rules_df = pd.DataFrame({"Rule_Obj": [str(r) for r in final_rules_found], "Rule_Score": rules_scores})
         figures_list = RulesPlotter(
             self.dataset_obj._original_data, final_rules_found, self.survival_event_col, self.survival_time_col
         ).kaplan_meier(self.top_n_plot)
 
-        # Info: Resumo básico
+        # Info: basic summary.
         if self.debug_performance:
             performance_stats = profiler.stop()
             info_df = pd.DataFrame(
                 {
-                    "Qtd_Regras": [rules_qtd],
-                    "Tempo_Total": [total_time],
-                    "Tamanho_Medio": [mean_size],
-                    "Melhor_Fitness": [final_metrics[1]],
+                    "rules_count": [rules_qtd],
+                    "total_time": [total_time],
+                    "mean_size": [mean_size],
+                    "best_fitness": [final_metrics[1]],
                     "cpu_mean_percent": [performance_stats.cpu_mean_percent],
                     "cpu_peak_percent": [performance_stats.cpu_peak_percent],
                     "ram_mean_mb": [performance_stats.ram_mean_mb],
@@ -455,10 +454,10 @@ class MEASE:
         else:
             info_df = pd.DataFrame(
                 {
-                    "Qtd_Regras": [rules_qtd],
-                    "Tempo_Total": [total_time],
-                    "Tamanho_Medio": [mean_size],
-                    "Melhor_Fitness": [final_metrics[1]],
+                    "rules_count": [rules_qtd],
+                    "total_time": [total_time],
+                    "mean_size": [mean_size],
+                    "best_fitness": [final_metrics[1]],
                 }
             )
 

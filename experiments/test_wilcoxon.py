@@ -69,26 +69,26 @@ def run_wilcoxon(
 
                 if significant:
                     result = (
-                        "melhor"
+                        "better"
                         if (higher_is_better and mean1 > mean2) or (not higher_is_better and mean1 < mean2)
-                        else "pior"
+                        else "worse"
                     )
                 else:
-                    result = "empate"
+                    result = "tie"
 
                 report.append(
                     {
                         "Dataset": dataset,
-                        "Metrica": metric,
+                        "Metric": metric,
                         "Rival": rival,
-                        "Media MEASE": round(mean1, 4),
+                        "Mean MEASE": round(mean1, 4),
                         "Std MEASE": round(std1, 4),
-                        "Mediana MEASE": round(median1, 4),
-                        "Media Rival": round(mean2, 4),
+                        "Median MEASE": round(median1, 4),
+                        "Mean Rival": round(mean2, 4),
                         "Std Rival": round(std2, 4),
-                        "Mediana Rival": round(median2, 4),
+                        "Median Rival": round(median2, 4),
                         "p-value": round(p_value, 4),
-                        "Resultado": result,
+                        "Result": result,
                     }
                 )
 
@@ -99,7 +99,7 @@ def run_wilcoxon(
     print(f"\nSaved to {output_file}")
 
     print("\n=== Summary: MEASE vs each rival across all datasets and metrics ===")
-    print(df_final.groupby(["Rival", "Resultado"]).size().unstack(fill_value=0))
+    print(df_final.groupby(["Rival", "Result"]).size().unstack(fill_value=0))
     return df_final
 
 

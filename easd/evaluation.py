@@ -13,16 +13,16 @@ class RuleEvaluator:
         self._fitness = 0.0
         self._all_indices = set(range(self.dataset_obj.size))
         self.alpha = alpha
-        # pré-computar os dados de tempo e eventos
+        # Precompute survival times and events.
         self._survival_times = self.dataset_obj._original_data[self.dataset_obj.surv_name]
         self._events = self.dataset_obj._original_data[self.dataset_obj._event_name]
-        # pré-computar a população complementar
+        # Precompute the complementary population.
         if comparacao == "complement":
             all_indices = set(range(len(self._survival_times)))
             self._complement_cases = list(all_indices - set(self.sub_group_cases))
 
     def get_covered_indices(self, rule, dataset):
-        # verificação se rule obedece o formato esperado: indices e valores
+        # Validate whether the rule follows the expected format: indices and values.
         if not rule or len(rule) < 2 or len(rule[0]) != len(rule[1]):
             return []
         indices, values = rule[0], rule[1]
@@ -43,52 +43,50 @@ class RuleEvaluator:
         return np.where(mask)[0].tolist()
 
     def fitness(self, rule, dataset_x):
-        "Recebe uma regra e calcula o seu fitness"
-        # Pensar em como adaptar para uma regra só
-        # separar o grupo que possui uma determinada regra e comparar com o basegroup escolhido
-        indices_group_regra = []
-        indices_group_regra = self.get_covered_indices(rule, dataset_x)
+        "Receives a rule and computes its fitness."
+        # Split the group covered by the rule and compare it with the selected baseline group.
+        rule_group_indices = []
+        rule_group_indices = self.get_covered_indices(rule, dataset_x)
         p_value = 1.0
 
-        if len(indices_group_regra) < 1:
+        if len(rule_group_indices) < 1:
             return 0.0
 
-        indices_complemento_regra = list(self._all_indices - set(indices_group_regra))
+        rule_complement_indices = list(self._all_indices - set(rule_group_indices))
 
-        if len(indices_complemento_regra) < 1:
+        if len(rule_complement_indices) < 1:
             return 0.0
-        # passo para garantir que
         if self.comparacao == "population":
             try:
                 times = self._survival_times.to_list()
                 events = self._events.to_list()
-                group_id = ["sg" if i in set(indices_group_regra) else "pop" for i in range(len(times))]
+                group_id = ["sg" if i in set(rule_group_indices) else "pop" for i in range(len(times))]
 
-                resultado_p_valor = sm.duration.survdiff(time=times, status=events, group=group_id)
-                p_value = resultado_p_valor[1]
+                p_value_result = sm.duration.survdiff(time=times, status=events, group=group_id)
+                p_value = p_value_result[1]
                 if pd.isna(p_value):
                     p_value = 1.0
             except (ValueError, ZeroDivisionError, Exception) as e:
                 p_value = 1.0
         elif self.comparacao == "complement":
             try:
-                sg = pd.Series("sub_group", index=indices_group_regra)
-                cpm = pd.Series("complement", index=indices_complemento_regra)
+                sg = pd.Series("sub_group", index=rule_group_indices)
+                cpm = pd.Series("complement", index=rule_complement_indices)
                 group = pd.concat([sg, cpm], axis=0, ignore_index=False).sort_index()
-                # para ter certeza que group e tempos e eventos compartilham os mesmos indices
-                tempos_filtrados = self._survival_times.loc[group.index]
-                eventos_filtrados = self._events.loc[group.index]
+                # Ensure group, survival times, and events share the same indices.
+                filtered_times = self._survival_times.loc[group.index]
+                filtered_events = self._events.loc[group.index]
 
-                resultado_p_valor = sm.duration.survdiff(tempos_filtrados, eventos_filtrados, group=group)
-                p_value = resultado_p_valor[1]
+                p_value_result = sm.duration.survdiff(filtered_times, filtered_events, group=group)
+                p_value = p_value_result[1]
                 if pd.isna(p_value):
                     p_value = 1.0
             except (ValueError, ZeroDivisionError, Exception) as e:
                 p_value = 1.0
-        suporte_relativo = len(indices_group_regra) / len(self._all_indices)
-        if suporte_relativo > 0.55 or suporte_relativo < 0.05:
+        relative_support = len(rule_group_indices) / len(self._all_indices)
+        if relative_support > 0.55 or relative_support < 0.05:
             return 0.0  # p=1 => fitness 0
-        return (1 - p_value) * (suporte_relativo**self.alpha)
+        return (1 - p_value) * (relative_support**self.alpha)
 
     def get_fitness(self, population, dataset_x):
         fitness_list = []
