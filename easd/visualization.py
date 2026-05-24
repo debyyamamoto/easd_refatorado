@@ -7,6 +7,8 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from lifelines import KaplanMeierFitter
 
+plt.rcParams.update({"font.size": 20})
+
 POPULATION = "Baseline Population"
 COMPLEMENT = "Complement"
 
@@ -41,10 +43,10 @@ class RulesPlotter:
 
         fitter = KaplanMeierFitter(label=POPULATION)
         fitter.fit(self.dataset[self.time_column], self.dataset[self.events_column])
-        fitter.plot_survival_function(ax=ax, linestyle="dashed", ci_show=False)
+        fitter.plot_survival_function(ax=ax, linestyle="dashed", color="#000000", ci_show=False)
 
-        for rule in self.rules[:p_num_top]:
-            self._plot_rules_curves(rule, ax)
+        for idx, rule in enumerate(self.rules[:p_num_top]):
+            self._plot_rules_curves(rule, ax, idx)
         ax.set_title(f"Top-{p_num_top} Kaplan-Meier Survival Curves")
         ax.set_xlabel("Time (e.g., months, days)")
         ax.set_ylabel("Survival Probability")
@@ -71,7 +73,7 @@ class RulesPlotter:
 
         return figures_list
 
-    def _plot_rules_curves(self, p_rule: list[list], p_ax: Axes):
+    def _plot_rules_curves(self, p_rule: list[list], p_ax: Axes, p_rule_idx: int):
         rule_string = ""
         rule_df = self.dataset.copy()
         atributes_list, constraints_list = p_rule
@@ -89,9 +91,9 @@ class RulesPlotter:
                 else:
                     rule_string = f"{rule_string} {atribute}∈{set(constraint)}"
 
-        fitter = KaplanMeierFitter(label=rule_string)
+        fitter = KaplanMeierFitter(label=f"Rule {p_rule_idx}")
         fitter.fit(rule_df[self.time_column], rule_df[self.events_column])
-        fitter.plot_survival_function(ax=p_ax)
+        fitter.plot_survival_function(ax=p_ax, ci_show=False)
 
     def _plot_rule_and_complement(self, p_rule: list[list], p_ax: Axes):
         rule_string = ""

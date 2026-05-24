@@ -1,51 +1,72 @@
-# Algoritmo EASD
+# MEASE
 
-## Instruções de Uso
+MEASE is organized in two layers:
 
-### Parâmetros de Configuração
+- `main.py` runs the algorithm on any parquet survival dataset.
+- `experiments/` reproduces the article protocol, result aggregation, and
+  hypothesis tests.
 
-| Argumento | Flag Curta | Obrigatório | Descrição | Valor Padrão |
-|-----------|------------|-------------|-----------|--------------|
-| filepath | (N/A) | Sim | Caminho para o arquivo .csv (ex: datasets/cancer.csv) | - |
-| time | -time_col | Sim | Nome da coluna de tempo (Survival Time) | - |
-| Evento | -event | Sim | Nome da coluna de evento (Status/Censura) | - |
-| delimiter | -d | Não | Delimitador do CSV (ex: , ou ;) | , |
-| header | --header | Não | Índice da linha de cabeçalho | 0 |
-| runs | -r | Não | Número de execuções independentes (loops) | 30 |
-| generations | -g | Não | Número máximo de gerações por busca de regra | 500 |
-| population | -p | Não | Tamanho da população (indivíduos) | 500 |
-| crossover | -c | Não | Taxa de Crossover (0-100) | 50 |
-| mutation | -m | Não | Taxa de Mutação (0-100) | 50 |
-| restart_check | --restart_check | Não | Percentual de gerações sem melhora para reiniciar | 10 |
-| restart_pct | --restart_pct | Não | Percentual da população a ser reiniciada | 10 |
-| comparação | --comparacao | Não | Baseline do Log-Rank (complement ou population) | Complement |
-| alpha | --a | Não | Peso Alpha para o Fitness | 0.5 |
-| executions | --exe | Não | Número de execuções do algoritmo | 1000 |
-| ksize | --ksize | Não | Tamanho do rank de Top-K regras | 10 |
+## Generic Use
 
-
-### Exemplos de Uso
-
-#### Exemplo 1: Dataset german.txt, coluna alvo 20 e separador de espaço
 ```bash
-python3 main.py datasets/cancer.csv -time time -event status -header 0
-```
-#### Execução com baseline de população e alpha ajustado
-```bash
-python3 main.py datasets/cancer.csv -time time -event status -comp population -a 0.8
+uv run python main.py datasets/files/cancer.parquet -time time -event status
 ```
 
-## Estrutura de Saída
+Population baseline with custom parameters:
 
-Os resultados são salvos em results/[nome_do_dataset]/.
+```bash
+uv run python main.py datasets/files/cancer.parquet -time time -event status -comp population -a 0.8 -exe 3
+```
 
-### Arquivos Gerados
+Results are written to `results/<dataset>/<baseline>/`.
 
-**Arquivos por execução:**
-- `[dataset][exec#]_DetailedRules.csv`:Todas as regras encontradas, seus intervalos e p-valores.
-- `[dataset][exec#]_Info.csv`: Estatísticas detalhadas de cobertura.
+## Main CLI Parameters
 
-**Arquivos agregados:**
-- `[dataset]_Mean_Evolution.csv`: Evolução do fitness médio.
-- `[dataset]_Best_Evolution.csv`: Evolução do melhor fitness encontrado.
-- `[dataset]_FinalResult.txt`: Resumo estatístico médio de todas as 30 (ou N) runs.
+| Argument | Required | Description | Default |
+| --- | --- | --- | --- |
+| `filepath` | yes | Path to a parquet dataset | - |
+| `-time`, `--time_col` | yes | Survival time column | - |
+| `-event`, `--event_col` | yes | Event/censoring column | - |
+| `--output_dir` | no | Output directory | `results` |
+| `--dataset_name` | no | Name used in generated files | file stem |
+| `--seed` | no | Reproducibility seed | run index |
+| `-g`, `--generations` | no | Maximum generations | `500` |
+| `-p`, `--population` | no | Population size | `500` |
+| `--restart_gen` | no | Generations without improvement | `3` |
+| `--restart_pop` | no | Population restart limit | `3` |
+| `--restart_pct` | no | Restarted population percentage | `10` |
+| `-comp`, `--comparacao` | no | `complement` or `population` baseline | `complement` |
+| `-a`, `--alpha` | no | Fitness alpha weight | `0.5` |
+| `-exe`, `--executions` | no | Independent executions | `1` |
+| `-k`, `--ksize` | no | Top-K rule rank size | `10` |
+| `-plt`, `--plt_rank` | no | Save top-N plots for a single execution | `0` |
+| `-d`, `--debug_performance` | no | Collect CPU/RAM metrics (`on`/`off`) | `off` |
+
+## Article Experiments
+
+Run the full article protocol:
+
+```bash
+bash ./experiments/main_stats.sh
+```
+
+The script calls `main.py` for each fixed dataset/baseline experiment from the
+article and then compiles per-run metrics into:
+
+- `experiments/resultados_complement.csv`
+- `experiments/resultados_population.csv`
+
+You can still compile per-run metrics manually:
+
+```bash
+uv run python experiments/collect_results.py --baseline complement
+uv run python experiments/collect_results.py --baseline population
+```
+
+Run Wilcoxon tests:
+
+```bash
+uv run python experiments/test_wilcoxon.py
+```
+
+See `experiments/README.md` and `AGENT.md` for the reproducibility map.
