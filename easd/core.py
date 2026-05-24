@@ -1,3 +1,4 @@
+import os
 import time
 import math
 import copy
@@ -13,6 +14,7 @@ from .evaluation import RuleEvaluator
 from .operators import GeneticOperators
 from .dataset import Dataset
 from .visualization import RulesPlotter
+from .performance import ProcessResourceMonitor
 
 EPSILON = 1e-12
 DEFAULT_CROSSOVER_RATE = 60
@@ -21,7 +23,7 @@ RATES_CHANGE_FATOR = 20
 console = Console()
 
 
-class EASD:
+class MEASE:
     def __init__(
         self,
         data: pd.DataFrame,
@@ -38,6 +40,7 @@ class EASD:
         ksize,
         plot_n_rules: int,
         coverage_threshold: float = 0.8,
+        debug_performance: bool = False,
     ):
         self.survival_event_col = event_col
         self.survival_time_col = time_col
@@ -64,6 +67,7 @@ class EASD:
         self.top_n_plot = plot_n_rules
         self.coverage_threshold = coverage_threshold
         seed(self.seed)
+        self.debug_performance = debug_performance
 
     def _get_mask(self, rule: list[list]):
         mask = np.ones(len(self.dataset_obj._original_data), dtype=bool)
@@ -316,6 +320,10 @@ class EASD:
 
     def run(self):
         start_time = time.time()
+        pid = os.getpid()
+        profiler = ProcessResourceMonitor(pid)
+        if self.debug_performance:
+            profiler.start()
 
         dataset_x = self.dataset_obj.data
 
@@ -428,14 +436,31 @@ class EASD:
         ).kaplan_meier(self.top_n_plot)
 
         # Info: Resumo básico
-        info_df = pd.DataFrame(
-            {
-                "Qtd_Regras": [rules_qtd],
-                "Tempo_Total": [total_time],
-                "Tamanho_Medio": [mean_size],
-                "Melhor_Fitness": [final_metrics[1]],
-            }
-        )
+        if self.debug_performance:
+            performance_stats = profiler.stop()
+            info_df = pd.DataFrame(
+                {
+                    "Qtd_Regras": [rules_qtd],
+                    "Tempo_Total": [total_time],
+                    "Tamanho_Medio": [mean_size],
+                    "Melhor_Fitness": [final_metrics[1]],
+                    "cpu_mean_percent": [performance_stats.cpu_mean_percent],
+                    "cpu_peak_percent": [performance_stats.cpu_peak_percent],
+                    "ram_mean_mb": [performance_stats.ram_mean_mb],
+                    "ram_peak_mb": [performance_stats.ram_peak_mb],
+                    "ram_incremental_peak_mb": [performance_stats.ram_incremental_peak_mb],
+                    "ram_baseline_mb": [performance_stats.ram_baseline_mb],
+                }
+            )
+        else:
+            info_df = pd.DataFrame(
+                {
+                    "Qtd_Regras": [rules_qtd],
+                    "Tempo_Total": [total_time],
+                    "Tamanho_Medio": [mean_size],
+                    "Melhor_Fitness": [final_metrics[1]],
+                }
+            )
 
         return (
             final_metrics,
