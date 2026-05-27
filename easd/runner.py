@@ -1,24 +1,17 @@
 from __future__ import annotations
-
 from dataclasses import dataclass, field
-from pathlib import Path
-import sys
 from typing import Literal
-
-import matplotlib
+from pathlib import Path
 import numpy as np
 import pandas as pd
-
-# for stream in (sys.stdout, sys.stderr):
-#     if hasattr(stream, "reconfigure"):
-#         stream.reconfigure(encoding="utf-8", errors="replace")
-
+import matplotlib
 from easd.core import MEASE
 from easd.metrics import compute_run_metrics, output_metrics
 
 matplotlib.use("Agg")
 
-Baseline = Literal["complement", "population"]
+BASELINE = Literal["complement", "population"]
+RATEPOLICY = Literal["adaptive", "fixed"]
 
 
 @dataclass(frozen=True)
@@ -35,18 +28,19 @@ class RunConfig:
     restart_gen: int = 3
     restart_pop: int = 3
     restart_pct: int = 10
-    comparacao: Baseline = "complement"
+    comparacao: BASELINE = "complement"
     alpha: float = 0.5
     ksize: int = 10
     plot_rank: int = 0
     threshold: float = 0.9
     debug_performance: bool = False
+    rate_policy: RATEPOLICY = "adaptive"
 
 
 @dataclass(frozen=True)
 class RunSummary:
     dataset_name: str
-    baseline: Baseline
+    baseline: BASELINE
     output_dir: Path
     executions: int
     run_metrics: list[dict]
@@ -85,6 +79,7 @@ def run_dataset(config: RunConfig) -> RunSummary:
             plot_n_rules=num_plots,
             coverage_threshold=config.threshold,
             debug_performance=config.debug_performance,
+            rate_policy=config.rate_policy,
         )
 
         _, _, _, runtime, _, info, detailed_rules, top_rules, mean_rule_size, figures = sd.run()
@@ -162,7 +157,7 @@ def _read_dataset(filepath: Path) -> pd.DataFrame:
 def _save_run_outputs(
     *,
     dataset_name: str,
-    baseline: Baseline,
+    baseline: BASELINE,
     run: int,
     detailed_rules: pd.DataFrame,
     runtime: float,
@@ -197,7 +192,7 @@ def _save_run_outputs(
 def _save_aggregate_outputs(
     *,
     dataset_name: str,
-    baseline: Baseline,
+    baseline: BASELINE,
     metrics_list: list[dict],
     output_dir: Path,
     aggregate_state: _AggregateState,

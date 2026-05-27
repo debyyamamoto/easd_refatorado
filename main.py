@@ -1,9 +1,6 @@
-from __future__ import annotations
-
-import argparse
 import sys
+import argparse
 from pathlib import Path
-
 from easd.runner import RunConfig, run_dataset
 
 
@@ -32,6 +29,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Baseline group for the log-rank test.",
     )
     parser.add_argument("-a", "--alpha", type=float, default=0.5, help="Fitness alpha weight.")
+    parser.add_argument(
+        "--rate_policy",
+        choices=["adaptive", "fixed"],
+        default="adaptive",
+        help="Crossover/mutation policy. Fixed uses crossover=60%% and mutation=40%%.",
+    )
     parser.add_argument("-exe", "--executions", type=int, default=1, help="Independent algorithm executions.")
     parser.add_argument("-k", "--ksize", type=int, default=10, help="Top-K rule rank size.")
     parser.add_argument(
@@ -71,6 +74,7 @@ def config_from_args(args: argparse.Namespace) -> RunConfig:
         plot_rank=args.plt_rank,
         threshold=args.threshold,
         debug_performance=args.debug_performance == "on",
+        rate_policy=args.rate_policy,
     )
 
 
