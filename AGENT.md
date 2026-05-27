@@ -46,6 +46,26 @@ files in `experiments/`. Generic runs should default to `results/`.
   explicitly about reproducing or updating article artifacts.
 - When touching metrics, verify both a one-run CLI path and the aggregate
   experiment path.
+- Keep quantitative-methods experiments as a separate reproducibility layer
+  under `experiments/`. Factorial designs, diagnostic plots, and hypothesis
+  tests should call `main.py` with explicit parameters instead of changing the
+  default article protocol.
+
+## Quantitative Methods Roadmap
+
+The planned experiments are documented in
+`experiments/quantitative_methods_plan.md`.
+
+- Runtime design: full `2^2` factorial with `population_size` and `dataset`
+  (`veteran` as low sample size, `mgus2` as high sample size), response
+  `total_time`.
+- Exceptionality design: full `2^3` factorial with `population_size`,
+  `generations`, and `rate_policy`, response `exceptionality`.
+- Algorithm comparison: MEASE versus EsmamDS for `total_time` and
+  `exceptionality`, using paired tests when run alignment allows it.
+- Required assumption checks: residual additivity/interaction review,
+  homoscedasticity, residuals-vs-fitted cloud, Q-Q plot normality check, and
+  independence through fresh randomized executions without cache reuse.
 
 ## Current Article Protocol
 

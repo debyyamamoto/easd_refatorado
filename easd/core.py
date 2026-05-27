@@ -4,6 +4,7 @@ import math
 import copy
 from random import seed
 from heapq import heapify, heappush, heappop
+from typing import Literal
 from rich.console import Console
 import numpy as np
 import pandas as pd
@@ -19,6 +20,7 @@ EPSILON = 1e-12
 DEFAULT_CROSSOVER_RATE = 60
 DEFAULT_MUTATION_RATE = 40
 RATES_CHANGE_FATOR = 20
+RATEPOLICY = Literal["adaptive", "fixed"]
 console = Console()
 
 
@@ -40,11 +42,18 @@ class MEASE:
         plot_n_rules: int,
         coverage_threshold: float = 0.8,
         debug_performance: bool = False,
+        rate_policy: RATEPOLICY = "adaptive",
     ):
+        if rate_policy not in ("adaptive", "fixed"):
+            raise ValueError("rate_policy must be either 'adaptive' or 'fixed'.")
+
         self.survival_event_col = event_col
         self.survival_time_col = time_col
+        self.rate_policy = rate_policy
         self.crossover_rate = DEFAULT_CROSSOVER_RATE
         self.mutation_rate = DEFAULT_MUTATION_RATE
+        self.initial_crossover_rate = DEFAULT_CROSSOVER_RATE
+        self.initial_mutation_rate = DEFAULT_MUTATION_RATE
         self.max_generations = max_generations
         self.population_size = population_size
         self.no_improvement_counter = 0
@@ -161,6 +170,9 @@ class MEASE:
             return -1
 
     def _update_mutation_crossover_rates(self):
+        if self.rate_policy == "fixed":
+            return
+
         if (
             self.prev_best_by_key == self.best_by_key
             and self.mutation_rate <= 80
@@ -178,10 +190,9 @@ class MEASE:
             self.crossover_rate += RATES_CHANGE_FATOR
 
     def _check_stop(self, gen_count):
-        if self.prev_best_by_key == {}:
-            self.prev_best_by_key = self.best_by_key.copy()
+        if gen_count >= self.max_generations:
+            return False
 
-            return True
         if self.restart_counter_consecutive >= self.max_pop_restarts:
             print(f"\n{'='*70}")
             console.log(
@@ -192,14 +203,15 @@ class MEASE:
 
             return False
 
-        elif gen_count == self.max_generations:
-
-            return False
-        else:
-            self._update_mutation_crossover_rates()
+        if self.prev_best_by_key == {}:
             self.prev_best_by_key = self.best_by_key.copy()
 
             return True
+
+        self._update_mutation_crossover_rates()
+        self.prev_best_by_key = self.best_by_key.copy()
+
+        return True
 
     def _evaluate_improvement(self, population, fitness_list, restart_prct, dataset):
         if self.prev_best_by_key == self.best_by_key and self.mutation_rate == 100:
@@ -335,6 +347,10 @@ class MEASE:
         console.print(f"   - Population: {self.population_size}")
         console.print(f"   - Generations: {self.max_generations}")
         console.print(f"   - Top-K: {self.ksize} best rules")
+        console.print(
+            f"   - Rate policy: {self.rate_policy} "
+            f"(crossover={self.crossover_rate}%, mutation={self.mutation_rate}%)"
+        )
         print(f"{'='*70}")
 
         gen_count = 0
@@ -435,14 +451,22 @@ class MEASE:
         ).kaplan_meier(self.top_n_plot)
 
         # Info: basic summary.
+        common_info = {
+            "rules_count": [rules_qtd],
+            "total_time": [total_time],
+            "mean_size": [mean_size],
+            "best_fitness": [final_metrics[1]],
+            "rate_policy": [self.rate_policy],
+            "initial_crossover_rate": [self.initial_crossover_rate],
+            "initial_mutation_rate": [self.initial_mutation_rate],
+            "final_crossover_rate": [self.crossover_rate],
+            "final_mutation_rate": [self.mutation_rate],
+        }
         if self.debug_performance:
             performance_stats = profiler.stop()
             info_df = pd.DataFrame(
                 {
-                    "rules_count": [rules_qtd],
-                    "total_time": [total_time],
-                    "mean_size": [mean_size],
-                    "best_fitness": [final_metrics[1]],
+                    **common_info,
                     "cpu_mean_percent": [performance_stats.cpu_mean_percent],
                     "cpu_peak_percent": [performance_stats.cpu_peak_percent],
                     "ram_mean_mb": [performance_stats.ram_mean_mb],
@@ -452,14 +476,7 @@ class MEASE:
                 }
             )
         else:
-            info_df = pd.DataFrame(
-                {
-                    "rules_count": [rules_qtd],
-                    "total_time": [total_time],
-                    "mean_size": [mean_size],
-                    "best_fitness": [final_metrics[1]],
-                }
-            )
+            info_df = pd.DataFrame(common_info)
 
         return (
             final_metrics,
