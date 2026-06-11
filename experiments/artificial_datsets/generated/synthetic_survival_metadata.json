@@ -1,0 +1,82 @@
+{
+  "generator": "experiments/artificial_datsets/main.py",
+  "article_reference": {
+    "title": "Learning and Naming Subgroups with Exceptional Survival Characteristics",
+    "url": "https://arxiv.org/abs/2602.22179",
+    "method": "Section 5.1 and Algorithm 5 synthetic survival data generator"
+  },
+  "ground_truth_warning": "The 'subgroup' column is the planted ground-truth label. Using it as a covariate when running MEASE leaks the answer.",
+  "parameters": {
+    "n": 1000,
+    "p": 10,
+    "k": 2,
+    "subgroup_ratio": 0.1,
+    "censoring_ratio": 0.1,
+    "population_scale": 5.0,
+    "subgroup_scale": 1.0,
+    "population_shape": 1.5,
+    "subgroup_shape": 1.5,
+    "seed": 42,
+    "vary": "none",
+    "vary_value": null,
+    "repeat": 0,
+    "hazard_ratio": null
+  },
+  "seed": 42,
+  "variation": {
+    "factor": "none",
+    "value": null,
+    "repeat": 0
+  },
+  "columns": {
+    "time": "time",
+    "event": "event",
+    "ground_truth_subgroup": "subgroup",
+    "features": [
+      "feature_0",
+      "feature_1",
+      "feature_2",
+      "feature_3",
+      "feature_4",
+      "feature_5",
+      "feature_6",
+      "feature_7",
+      "feature_8",
+      "feature_9"
+    ]
+  },
+  "true_rule": {
+    "epsilon": 0.31622776601683794,
+    "features": [
+      0,
+      7
+    ],
+    "intervals": [
+      {
+        "feature": "feature_0",
+        "feature_index": 0,
+        "lower": 0.13859723422113104,
+        "upper": 0.454825000237969
+      },
+      {
+        "feature": "feature_7",
+        "feature_index": 7,
+        "lower": 0.025063941441721103,
+        "upper": 0.341291707458559
+      }
+    ],
+    "rule": "feature_0 in [0.138597, 0.454825] and feature_7 in [0.025064, 0.341292]"
+  },
+  "actual": {
+    "subgroup_ratio": 0.089,
+    "censoring_ratio": 0.11,
+    "events_ratio": 0.89,
+    "n": 1000,
+    "p": 10
+  },
+  "dataset_name": "synthetic_survival",
+  "files": {
+    "parquet": "synthetic_survival.parquet",
+    "metadata": "synthetic_survival_metadata.json"
+  }
+}

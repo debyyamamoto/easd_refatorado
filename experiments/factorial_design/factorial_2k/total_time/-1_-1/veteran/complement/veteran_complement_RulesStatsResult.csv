@@ -1,0 +1,2 @@
+mean_score,mean_runtime,mean_rule_size,cpu_mean_percent,cpu_peak_percent,ram_mean_mb,ram_peak_mb,ram_incremental_peak_mb,ram_baseline_mb
+0.91+/-0.03,24.75+/-0.0,2.01+/-0.0,8.27+/-0.0,10.49+/-0.0,206.68+/-0.0,206.69+/-0.0,0.17+/-0.0,206.53+/-0.0

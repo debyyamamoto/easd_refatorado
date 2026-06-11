@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import numpy as np
 import pandas as pd
 import pandas.api.types as ptypes
 import matplotlib.pyplot as plt
@@ -129,3 +130,17 @@ class RulesPlotter:
         fitter = KaplanMeierFitter(label=rule_string)
         fitter.fit(rule_df[self.time_column], rule_df[self.events_column])
         fitter.plot_survival_function(ax=p_ax)
+
+
+def plot_topk_convergency(p_topk_best_fit: list, p_gen_best_fit: list):
+    gens_array = np.arange(len(p_gen_best_fit))
+    fig, ax = plt.subplots(figsize=(12, 10))
+    ax.plot(gens_array, p_gen_best_fit)
+    ax.plot(gens_array, p_topk_best_fit)
+    ax.grid()
+    ax.set_title("Score Convergency")
+    ax.legend(["Generations best score", "Top-K best score"])
+    ax.set_xlabel("Generations")
+    ax.set_ylabel("Score")
+
+    return fig

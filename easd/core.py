@@ -13,7 +13,7 @@ from .population import PopulationGenerator
 from .evaluation import RuleEvaluator
 from .operators import GeneticOperators
 from .dataset import Dataset
-from .visualization import RulesPlotter
+from .visualization import RulesPlotter, plot_topk_convergency
 from .performance import ProcessResourceMonitor
 
 EPSILON = 1e-12
@@ -356,6 +356,7 @@ class MEASE:
         gen_count = 0
         population = self.generator.gen_population(self.population_size, dataset_x)
         gen_mean_fitness, gen_best_fitness = [], []
+        best_topk_score_register, best_gen_score_register = [], []
 
         with console.status("[bold green] Evolving generations...") as status:
             while self._check_stop(gen_count):
@@ -370,6 +371,8 @@ class MEASE:
                 fitness_list = self.evaluation.get_fitness(population, dataset_x)
 
                 self._update_top_k(population, fitness_list)
+                best_topk_score_register.append(next(reversed(self.best_by_key.values()))[0])
+                best_gen_score_register.append(np.max(fitness_list))
 
                 if fitness_list:
                     mean_fit = np.mean(fitness_list)
@@ -449,6 +452,7 @@ class MEASE:
         figures_list = RulesPlotter(
             self.dataset_obj._original_data, final_rules_found, self.survival_event_col, self.survival_time_col
         ).kaplan_meier(self.top_n_plot)
+        figures_list.append(plot_topk_convergency(best_topk_score_register, best_gen_score_register))
 
         # Info: basic summary.
         common_info = {

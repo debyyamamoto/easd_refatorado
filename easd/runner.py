@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import matplotlib
 from easd.core import MEASE
-from easd.metrics import compute_run_metrics, output_metrics
+from easd.metrics import compute_run_metrics, output_metrics, calculate_max_f1_score
 
 matplotlib.use("Agg")
 
@@ -19,6 +19,7 @@ class RunConfig:
     filepath: Path
     time_col: str
     event_col: str
+    label_col: str
     output_dir: Path = Path("results")
     dataset_name: str | None = None
     seed: int | None = None
@@ -50,6 +51,13 @@ class RunSummary:
 
 def run_dataset(config: RunConfig) -> RunSummary:
     data = _read_dataset(config.filepath)
+    if config.label_col:
+        subgroups_labels = data[config.label_col].to_numpy()
+        subgroups_labels: np.ndarray
+        data = data.drop(columns=[config.label_col])
+    else:
+        subgroups_labels = np.array([])
+
     dataset_name = config.dataset_name or config.filepath.stem
     output_dir = config.output_dir / dataset_name / config.comparacao
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -91,7 +99,11 @@ def run_dataset(config: RunConfig) -> RunSummary:
             dataset_obj=sd.dataset_obj,
             baseline=config.comparacao,
         ).as_dict()
+        run_metrics.update(_topk_rule_score_metrics(detailed_rules))
         metrics_list.append(run_metrics)
+        if config.label_col:
+            max_f1_score = calculate_max_f1_score(data, top_rules, subgroups_labels, sd.dataset_obj)
+            run_metrics.update({"max_f1_score": max_f1_score})
 
         _save_run_outputs(
             dataset_name=dataset_name,
@@ -152,6 +164,16 @@ def _read_dataset(filepath: Path) -> pd.DataFrame:
         raise FileNotFoundError(f"Dataset file not found: {filepath}") from exc
     except Exception as exc:
         raise RuntimeError(f"Could not read dataset {filepath}: {exc}") from exc
+
+
+def _topk_rule_score_metrics(detailed_rules: pd.DataFrame) -> dict[str, float]:
+    if detailed_rules is None or detailed_rules.empty or "Rule_Score" not in detailed_rules.columns:
+        return {"mean_rule_score": 0.0}
+
+    scores = pd.to_numeric(detailed_rules["Rule_Score"], errors="coerce").dropna()
+    if scores.empty:
+        return {"mean_rule_score": 0.0}
+    return {"mean_rule_score": float(scores.mean())}
 
 
 def _save_run_outputs(
@@ -268,10 +290,13 @@ def _save_aggregate_outputs(
     return stats_path, metrics_path
 
 
-def _save_figures(figures: list, output_dir: Path, plot_rank: int) -> None:
+def _save_figures(figures_list: list, output_dir: Path, plot_rank: int) -> None:
+    convergency_plot = figures_list.pop(-1)
+    convergency_plot.savefig(output_dir / "convergency_score.pdf", dpi=1000, bbox_inches="tight")
+
     if plot_rank <= 0:
         return
-    for i, figure in enumerate(figures):
+    for i, figure in enumerate(figures_list):
         filename = f"top-{plot_rank}_best_rules.pdf" if i == 0 else f"top-{i}_rule.pdf"
         figure.savefig(output_dir / filename, dpi=1000, bbox_inches="tight")
 

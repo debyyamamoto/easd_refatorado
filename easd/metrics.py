@@ -6,6 +6,7 @@ import math
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
+from sklearn.metrics import f1_score
 from autorank import autorank
 from .dataset import Dataset
 from rich.console import Console
@@ -327,6 +328,18 @@ def _rule_to_column_names(rule: Rule, dataset_obj: Optional[Dataset] = None) -> 
         else:
             col_names.append(str(a))
     return col_names, list(cons)
+
+
+def calculate_max_f1_score(
+    df: pd.DataFrame, rules: Sequence[Rule], labels_array: np.ndarray, dataset_obj: Optional[Dataset] = None
+):
+    f1_scores_list = []
+    for rule in rules:
+        rule_index = covered_indices(rule, df, dataset_obj=dataset_obj)
+        rule_hat = np.array([1 if i in rule_index else 0 for i in range(df.shape[0])]).astype(np.int64)
+        f1_scores_list.append(f1_score(labels_array, rule_hat))
+
+    return np.max(f1_scores_list)
 
 
 def covered_indices(rule: Rule, df: pd.DataFrame, dataset_obj: Optional[Dataset] = None) -> List[int]:

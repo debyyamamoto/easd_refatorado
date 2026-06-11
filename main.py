@@ -12,6 +12,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("filepath", type=Path, help="Path to a parquet dataset.")
     parser.add_argument("-time", "--time_col", required=True, help="Survival time column name.")
     parser.add_argument("-event", "--event_col", required=True, help="Event/censoring status column name.")
+    parser.add_argument(
+        "-label",
+        "--subgroup_label_col",
+        required=False,
+        default=False,
+        help="Subgroup label column name. If subgroups are known, the F1-Score is calculated",
+    )
     parser.add_argument("--output_dir", type=Path, default=Path("results"), help="Directory for generated outputs.")
     parser.add_argument("--dataset_name", default=None, help="Optional name used in output files.")
     parser.add_argument("--seed", type=int, default=None, help="Seed for reproducibility.")
@@ -59,6 +66,7 @@ def config_from_args(args: argparse.Namespace) -> RunConfig:
         filepath=args.filepath,
         time_col=args.time_col,
         event_col=args.event_col,
+        label_col=args.subgroup_label_col,
         output_dir=args.output_dir,
         dataset_name=args.dataset_name,
         seed=args.seed,

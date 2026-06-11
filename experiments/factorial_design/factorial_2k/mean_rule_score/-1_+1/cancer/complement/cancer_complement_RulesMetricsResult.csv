@@ -1,0 +1,11 @@
+,mean+/-std,meanrank
+description redundancy,0.1054+/-0.0526,1.0
+CR,0.4446+/-0.0397,2.13
+sgCov,0.4983+/-0.0362,3.27
+coverage redundancy,0.6365+/-0.065,4.47
+model redundancy,0.6489+/-0.162,4.53
+exceptionality,0.8333+/-0.1175,6.07
+mean_rule_score,0.9083+/-0.0048,6.73
+setCov,0.981+/-0.0208,7.8
+length,1.8933+/-0.2219,9.0
+#sg,10.0+/-0.0,10.0

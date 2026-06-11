@@ -1,0 +1,2 @@
+rules_count,total_time,mean_size,best_fitness,rate_policy,initial_crossover_rate,initial_mutation_rate,final_crossover_rate,final_mutation_rate
+10,431.0362939834595,1.7,0.6328960716430052,adaptive,60,40,60,40

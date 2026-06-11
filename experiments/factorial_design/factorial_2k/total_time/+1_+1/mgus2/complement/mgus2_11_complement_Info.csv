@@ -1,0 +1,2 @@
+rules_count,total_time,mean_size,best_fitness,rate_policy,initial_crossover_rate,initial_mutation_rate,final_crossover_rate,final_mutation_rate,cpu_mean_percent,cpu_peak_percent,ram_mean_mb,ram_peak_mb,ram_incremental_peak_mb,ram_baseline_mb
+10,662.3847768306732,1.9,0.9418529937751725,adaptive,60,40,60,40,8.2705133280549,12.341666666666667,214.84373144299286,214.84375,0.04296875,214.80078125

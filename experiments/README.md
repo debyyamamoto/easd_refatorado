@@ -41,3 +41,38 @@ uv run python experiments/test_wilcoxon.py
 By default this compares `experiments/resultados_complement.csv` against
 `experiments/results_esmam/metrics_baseline-complement.csv` and saves
 `experiments/wilcoxon.csv`.
+
+## Quantitative Methods Experiments
+
+The planned factorial experiments for runtime, exceptionality, and MEASE versus
+EsmamDS comparison are mapped in:
+
+```bash
+experiments/quantitative_methods_plan.md
+experiments/designs/factorial_runtime.csv
+experiments/designs/factorial_exceptionality.csv
+```
+
+These files define the target questions, factor levels, responses, assumptions,
+diagnostics, and implementation improvements needed before running the
+confirmatory experiments.
+
+After running the factorial treatments with `factorial.py`, build the design
+matrix, estimate effects with the manual `2^k r` contrast method, run ANOVA,
+and export assumption diagnostics with:
+
+```bash
+uv run python experiments/analyze_factorial.py
+```
+
+The analysis writes:
+
+- `*_2kr_treatment_table.csv`: one row per treatment, coded signs, replicate
+  responses, treatment totals, treatment means, `SSY_i`, and `SSE_i`.
+- `*_2kr_steps.csv`: the classroom calculation sequence with `SSY`, `SS0`,
+  each `SS_i`, `SSE`, `SST`, `q_i`, `s_qi`, and explained variance.
+- `*_effects.csv`, `*_anova.csv`, `*_additive_residuals.csv`, and diagnostic
+  plots for interpretation and assumption checks.
+
+With the default `--transform auto`, a log-scale analysis is also written when
+the raw response suggests non-additive or multiplicative behavior.

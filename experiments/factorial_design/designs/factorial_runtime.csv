@@ -1,0 +1,5 @@
+experiment,factor,population,dataset,dataset_level,generations,rate_policy,response
+runtime,-1_-1,50,veteran|datasets/files/veteran.parquet|survival|status,low,500,adaptive,total_time
+runtime,+1_-1,1000,veteran|datasets/files/veteran.parquet|survival|status,low,500,adaptive,total_time
+runtime,-1_+1,50,mgus2|datasets/files/mgus2.parquet|futime|status,high,500,adaptive,total_time
+runtime,+1_+1,1000,mgus2|datasets/files/mgus2.parquet|futime|status,high,500,adaptive,total_time
