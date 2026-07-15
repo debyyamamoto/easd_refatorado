@@ -19,7 +19,7 @@ class RunConfig:
     filepath: Path
     time_col: str
     event_col: str
-    label_col: str
+    label_col: str | None
     output_dir: Path = Path("results")
     dataset_name: str | None = None
     seed: int | None = None
@@ -51,7 +51,7 @@ class RunSummary:
 
 def run_dataset(config: RunConfig) -> RunSummary:
     data = _read_dataset(config.filepath)
-    if config.label_col:
+    if config.label_col is not None:
         subgroups_labels = data[config.label_col].to_numpy()
         subgroups_labels: np.ndarray
         data = data.drop(columns=[config.label_col])
@@ -101,14 +101,14 @@ def run_dataset(config: RunConfig) -> RunSummary:
         ).as_dict()
         run_metrics.update(_topk_rule_score_metrics(detailed_rules))
         metrics_list.append(run_metrics)
-        if config.label_col:
+        if config.label_col is not None:
             max_f1_score = calculate_max_f1_score(data, top_rules, subgroups_labels, sd.dataset_obj)
             run_metrics.update({"max_f1_score": max_f1_score})
 
         _save_run_outputs(
             dataset_name=dataset_name,
             baseline=config.comparacao,
-            run=run,
+            run=run + 28,
             detailed_rules=detailed_rules,
             runtime=float(runtime),
             mean_rule_size=float(mean_rule_size),

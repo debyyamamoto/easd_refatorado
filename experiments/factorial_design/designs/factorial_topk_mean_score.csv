@@ -1,5 +1,5 @@
-experiment,factor,population,generations,rate_policy,alpha,dataset,response
-topk_quality,-1_-1,50,500,adaptive,0.10,cancer|datasets/files/cancer.parquet|time|status,mean_rule_score
-topk_quality,+1_-1,50,500,adaptive,0.70,cancer|datasets/files/cancer.parquet|time|status,mean_rule_score
-topk_quality,-1_+1,500,500,adaptive,0.10,cancer|datasets/files/cancer.parquet|time|status,mean_rule_score
-topk_quality,+1_+1,500,500,adaptive,0.70,cancer|datasets/files/cancer.parquet|time|status,mean_rule_score
+experiment,factor,alpha,population,generations,rate_policy,dataset,response
+topk_quality,-1_-1,0.10,50,500,adaptive,cancer|datasets/files/cancer.parquet|time|status|,mean_rule_score
+topk_quality,+1_-1,0.70,50,500,adaptive,cancer|datasets/files/cancer.parquet|time|status|,mean_rule_score
+topk_quality,-1_+1,0.10,500,500,adaptive,cancer|datasets/files/cancer.parquet|time|status|,mean_rule_score
+topk_quality,+1_+1,0.70,500,500,adaptive,cancer|datasets/files/cancer.parquet|time|status|,mean_rule_score

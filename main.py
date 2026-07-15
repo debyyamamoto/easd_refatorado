@@ -15,8 +15,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-label",
         "--subgroup_label_col",
+        type=str,
         required=False,
-        default=False,
+        default=None,
         help="Subgroup label column name. If subgroups are known, the F1-Score is calculated",
     )
     parser.add_argument("--output_dir", type=Path, default=Path("results"), help="Directory for generated outputs.")

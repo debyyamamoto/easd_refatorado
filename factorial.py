@@ -9,11 +9,11 @@ FACTORIAL_TOPK_QUALITY_CSV = "experiments/factorial_design/designs/factorial_top
 FACTORIAL_TOPK_QUALITY_CONTROL_CSV = "experiments/factorial_design/designs/factorial_topk_quality_controls.csv"
 FACTORIAL_TOPK_QUALITY_MEAN_CSV = "experiments/factorial_design/designs/factorial_topk_mean_score.csv"
 FACTORIAL_PROJECTS_LIST = [
-    # FACTORIAL_RUNTIME_CSV,
+    FACTORIAL_RUNTIME_CSV,
     # FACTORIAL_SCORE_CSV,
     # FACTORIAL_TOPK_QUALITY_CSV,
     # FACTORIAL_TOPK_QUALITY_CONTROL_CSV,
-    FACTORIAL_TOPK_QUALITY_MEAN_CSV,
+    # FACTORIAL_TOPK_QUALITY_MEAN_CSV,
 ]
 EXPERIMENT_NAME_COLUMN = "experiment"
 RESPONSE_VAR_COLUMN = "response"
@@ -71,9 +71,12 @@ def as_bool(value) -> bool:
 
 
 def config_from_args(p_args: dict) -> RunConfig:
+    if p_args["label_col"] == "":
+        p_args["label_col"] = None
     return RunConfig(
         filepath=Path(p_args["filepath"]),
         time_col=p_args["time_col"],
+        label_col=p_args["label_col"],
         event_col=p_args["event_col"],
         output_dir=Path(p_args["output_dir"]),
         dataset_name=p_args["dataset_name"],
@@ -118,11 +121,14 @@ def run_factorial_designs(designs: list[Path], output_dir: str, executions: int)
 
         for _, experiment in exp_df.iterrows():
             run_arguments = dict(arguments_dict)
-            dataset_name, file_path, time_column, event_column = str(experiment[DATASET_COLUMN]).split("|")
+            dataset_name, file_path, time_column, event_column, label_column = str(experiment[DATASET_COLUMN]).split(
+                "|"
+            )
             run_arguments["config"] = experiment[FACTOR_COLUMN]
             run_arguments["filepath"] = file_path
             run_arguments["time_col"] = time_column
             run_arguments["event_col"] = event_column
+            run_arguments["label_col"] = label_column
             run_arguments["dataset_name"] = dataset_name
             run_arguments["output_dir"] = f"{output_dir}/{response_var}/{experiment[FACTOR_COLUMN]}"
             run_arguments["executions"] = executions

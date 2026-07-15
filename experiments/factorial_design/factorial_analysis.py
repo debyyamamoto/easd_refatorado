@@ -17,8 +17,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 EXPERIMENTS_DIR = Path(__file__).resolve().parent
 DEFAULT_DESIGNS = [
     EXPERIMENTS_DIR / "designs" / "factorial_runtime.csv",
-    EXPERIMENTS_DIR / "designs" / "factorial_score.csv",
-    EXPERIMENTS_DIR / "designs" / "factorial_topk_quality_controls.csv",
+    # EXPERIMENTS_DIR / "designs" / "factorial_score.csv",
+    EXPERIMENTS_DIR / "designs" / "factorial_topk_mean_score.csv",
 ]
 DEFAULT_RESULTS_DIR = EXPERIMENTS_DIR / "factorial_2k"
 DEFAULT_OUTPUT_DIR = EXPERIMENTS_DIR / "factorial_analysis"
@@ -138,9 +138,11 @@ def apply_response_transform(values: pd.Series, transform: str) -> tuple[np.ndar
 
 def parse_dataset_spec(dataset_spec: str) -> tuple[str, Path, str, str]:
     parts = str(dataset_spec).split("|")
-    if len(parts) != 4:
-        raise ValueError("Dataset specifications must use 'name|path|time_col|event_col'. " f"Got: {dataset_spec}")
-    dataset_name, dataset_path, time_col, event_col = parts
+    if len(parts) != 5:
+        raise ValueError(
+            "Dataset specifications must use 'name|path|time_col|event_col|label'. " f"Got: {dataset_spec}"
+        )
+    dataset_name, dataset_path, time_col, event_col, _ = parts
     return dataset_name, Path(dataset_path), time_col, event_col
 
 
@@ -445,6 +447,12 @@ def build_effects_df(
         ms_i = ss_i
         f_value = ms_i / mse if mse > 0 and math.isfinite(ms_i) else math.nan
         p_value = stats.f.sf(f_value, 1, df_error) if math.isfinite(f_value) and df_error > 0 else math.nan
+        ci_margin = t_critical * s_qi if math.isfinite(t_critical) and math.isfinite(s_qi) else math.nan
+        ci_low = q_i - ci_margin if math.isfinite(ci_margin) else math.nan
+        ci_high = q_i + ci_margin if math.isfinite(ci_margin) else math.nan
+        ci_contains_zero = bool(ci_low <= 0 <= ci_high) if math.isfinite(ci_low) and math.isfinite(ci_high) else math.nan
+        relevant_by_ci = not ci_contains_zero if isinstance(ci_contains_zero, bool) else math.nan
+        decision_by_ci = "relevant" if relevant_by_ci is True else "not_relevant" if relevant_by_ci is False else "undefined"
 
         rows.append(
             {
@@ -456,14 +464,22 @@ def build_effects_df(
                 "q_i": q_i,
                 "SS_i": ss_i,
                 "df_i": 1,
+                "df_error": df_error,
                 "MS_i": ms_i,
                 "F": f_value,
                 "p_value": p_value,
                 "MSE": mse,
                 "s_e": s_e,
                 "s_qi": s_qi,
-                "effect_ci_low": q_i - t_critical * s_qi if math.isfinite(s_qi) else math.nan,
-                "effect_ci_high": q_i + t_critical * s_qi if math.isfinite(s_qi) else math.nan,
+                "alpha_sig": alpha,
+                "confidence_level": 1 - alpha,
+                "t_critical": t_critical,
+                "ci_margin": ci_margin,
+                "effect_ci_low": ci_low,
+                "effect_ci_high": ci_high,
+                "ci_contains_zero": ci_contains_zero,
+                "relevant_by_ci": relevant_by_ci,
+                "decision_by_ci": decision_by_ci,
                 "variance_explained": variance_fraction(ss_i, float(summary["SST"])),
                 "variance_explained_percent": 100 * variance_fraction(ss_i, float(summary["SST"])),
                 "balanced_replications": balanced,
@@ -471,6 +487,46 @@ def build_effects_df(
             }
         )
 
+    return pd.DataFrame(rows)
+
+
+def build_confidence_intervals_df(effects_df: pd.DataFrame, factorial_df: pd.DataFrame, alpha: float) -> pd.DataFrame:
+    summary = sum_squares_summary(factorial_df)
+    balanced, r = balanced_replications(factorial_df)
+    rows = []
+    for _, effect in effects_df.iterrows():
+        rows.append(
+            {
+                "term": effect["term"],
+                "factors": effect["factors"],
+                "q_i": effect["q_i"],
+                "SSE": summary["SSE"],
+                "df_error_formula": "2^k * (r - 1)",
+                "df_error": summary["df_error"],
+                "MSE_formula": "SSE / df_error",
+                "MSE": summary["MSE"],
+                "s_e_formula": "sqrt(MSE)",
+                "s_e": summary["s_e"],
+                "n_total_formula": "2^k * r",
+                "n_total": summary["n_total"],
+                "s_qi_formula": "s_e / sqrt(2^k * r)",
+                "s_qi": effect["s_qi"],
+                "alpha_sig": alpha,
+                "confidence_level": 1 - alpha,
+                "t_critical_formula": "t.ppf(1 - alpha_sig / 2, df_error)",
+                "t_critical": effect["t_critical"],
+                "ci_margin_formula": "t_critical * s_qi",
+                "ci_margin": effect["ci_margin"],
+                "ci_low_formula": "q_i - ci_margin",
+                "effect_ci_low": effect["effect_ci_low"],
+                "ci_high_formula": "q_i + ci_margin",
+                "effect_ci_high": effect["effect_ci_high"],
+                "ci_contains_zero": effect["ci_contains_zero"],
+                "relevant_by_ci": effect["relevant_by_ci"],
+                "balanced_replications": balanced,
+                "r": r,
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -508,9 +564,16 @@ def build_ss_steps_df(factorial_df: pd.DataFrame, effects_df: pd.DataFrame) -> p
                 "formula": "SS_i = (2^k r) * q_i^2",
                 "value": effect["SS_i"],
                 "df": effect["df_i"],
+                "df_error": effect["df_error"],
                 "mean_square": effect["MS_i"],
                 "q_i": effect["q_i"],
+                "s_e": effect["s_e"],
                 "s_qi": effect["s_qi"],
+                "t_critical": effect["t_critical"],
+                "ci_margin": effect["ci_margin"],
+                "effect_ci_low": effect["effect_ci_low"],
+                "effect_ci_high": effect["effect_ci_high"],
+                "relevant_by_ci": effect["relevant_by_ci"],
                 "variance_explained": effect["variance_explained"],
                 "variance_explained_percent": effect["variance_explained_percent"],
             }
@@ -593,6 +656,16 @@ def build_coefficients_df(factorial_df: pd.DataFrame, effects_df: pd.DataFrame) 
             "MSE": summary["MSE"],
             "s_e": summary["s_e"],
             "s_qi": math.nan,
+            "df_error": summary["df_error"],
+            "alpha_sig": math.nan,
+            "confidence_level": math.nan,
+            "t_critical": math.nan,
+            "ci_margin": math.nan,
+            "effect_ci_low": math.nan,
+            "effect_ci_high": math.nan,
+            "ci_contains_zero": math.nan,
+            "relevant_by_ci": math.nan,
+            "decision_by_ci": math.nan,
             "variance_explained": math.nan,
             "variance_explained_percent": math.nan,
             "balanced_replications": effects_df["balanced_replications"].iloc[0] if not effects_df.empty else math.nan,
@@ -928,6 +1001,7 @@ def analyze_design(
     factorial_display_df = build_factorial_display_df(factorial_df, factors)
     effects_df = build_effects_df(factorial_df, factors, alpha)
     coefficients_df = build_coefficients_df(factorial_df, effects_df)
+    confidence_intervals_df = build_confidence_intervals_df(effects_df, factorial_df, alpha)
     ss_steps_df = build_ss_steps_df(factorial_df, effects_df)
     variance_df = build_variance_explained_df(effects_df, factorial_df)
     residuals_df = build_residuals_df(responses_df, coefficients_df, factors)
@@ -941,6 +1015,7 @@ def analyze_design(
     factorial_display_df.to_csv(f"{prefix}_factorial_df.csv", index=False)
     coefficients_df.to_csv(f"{prefix}_coefficients.csv", index=False)
     effects_df.to_csv(f"{prefix}_effects.csv", index=False)
+    confidence_intervals_df.to_csv(f"{prefix}_confidence_intervals.csv", index=False)
     ss_steps_df.to_csv(f"{prefix}_ss_steps.csv", index=False)
     variance_df.to_csv(f"{prefix}_variance_explained.csv", index=False)
     residuals_df.to_csv(f"{prefix}_residuals.csv", index=False)
@@ -953,6 +1028,7 @@ def analyze_design(
     print(f"Rows: {len(responses_df)} responses, {len(factorial_df)} treatments")
     print(f"Saved classroom factorial table: {prefix}_factorial_df.csv")
     print(f"Saved coefficients: {prefix}_coefficients.csv")
+    print(f"Saved confidence intervals: {prefix}_confidence_intervals.csv")
     print(f"Saved SS steps: {prefix}_ss_steps.csv")
     print(f"Saved variance explained: {prefix}_variance_explained.csv")
     print(f"Saved assumption checks: {prefix}_assumption_checks.csv")

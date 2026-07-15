@@ -81,9 +81,9 @@ class RulesPlotter:
             if not ptypes.is_string_dtype(rule_df[atribute].dtype):
                 rule_df = rule_df[(rule_df[atribute] >= constraint[0]) & (rule_df[atribute] <= constraint[1])]
                 if len(constraints_list) > 1 and idx != len(constraints_list) - 1:
-                    rule_string = f"{rule_string} {constraint[0]}≤{atribute}≤{constraint[1]} ^"
+                    rule_string = f"{rule_string} {constraint[0]:.4f}≤{atribute}≤{constraint[1]:.4f} ^"
                 else:
-                    rule_string = f"{rule_string} {constraint[0]}≤{atribute}≤{constraint[1]}"
+                    rule_string = f"{rule_string} {constraint[0]:.4f}≤{atribute}≤{constraint[1]:.4f}"
             else:
                 rule_df = rule_df[rule_df[atribute].isin(constraint)]
                 if len(constraints_list) > 1 and idx != len(constraints_list) - 1:
@@ -104,9 +104,9 @@ class RulesPlotter:
             if not ptypes.is_string_dtype(rule_df[atribute].dtype):
                 rule_df = rule_df[(rule_df[atribute] >= constraint[0]) & (rule_df[atribute] <= constraint[1])]
                 if len(constraints_list) > 1 and idx != len(constraints_list) - 1:
-                    rule_string = f"{rule_string} {constraint[0]}≤{atribute}≤{constraint[1]} ^"
+                    rule_string = f"{rule_string} {constraint[0]:.4f}≤{atribute}≤{constraint[1]:.4f} ^"
                 else:
-                    rule_string = f"{rule_string} {constraint[0]}≤{atribute}≤{constraint[1]}"
+                    rule_string = f"{rule_string} {constraint[0]:.4f}≤{atribute}≤{constraint[1]:.4f}"
             else:
                 rule_df = rule_df[rule_df[atribute].isin(constraint)]
                 if len(constraints_list) > 1 and idx != len(constraints_list) - 1:
