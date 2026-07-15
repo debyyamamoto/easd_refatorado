@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import numpy as np
 import pandas as pd
 import pandas.api.types as ptypes
 import matplotlib.pyplot as plt
@@ -80,9 +81,9 @@ class RulesPlotter:
             if not ptypes.is_string_dtype(rule_df[atribute].dtype):
                 rule_df = rule_df[(rule_df[atribute] >= constraint[0]) & (rule_df[atribute] <= constraint[1])]
                 if len(constraints_list) > 1 and idx != len(constraints_list) - 1:
-                    rule_string = f"{rule_string} {constraint[0]}≤{atribute}≤{constraint[1]} ^"
+                    rule_string = f"{rule_string} {constraint[0]:.4f}≤{atribute}≤{constraint[1]:.4f} ^"
                 else:
-                    rule_string = f"{rule_string} {constraint[0]}≤{atribute}≤{constraint[1]}"
+                    rule_string = f"{rule_string} {constraint[0]:.4f}≤{atribute}≤{constraint[1]:.4f}"
             else:
                 rule_df = rule_df[rule_df[atribute].isin(constraint)]
                 if len(constraints_list) > 1 and idx != len(constraints_list) - 1:
@@ -103,9 +104,9 @@ class RulesPlotter:
             if not ptypes.is_string_dtype(rule_df[atribute].dtype):
                 rule_df = rule_df[(rule_df[atribute] >= constraint[0]) & (rule_df[atribute] <= constraint[1])]
                 if len(constraints_list) > 1 and idx != len(constraints_list) - 1:
-                    rule_string = f"{rule_string} {constraint[0]}≤{atribute}≤{constraint[1]} ^"
+                    rule_string = f"{rule_string} {constraint[0]:.4f}≤{atribute}≤{constraint[1]:.4f} ^"
                 else:
-                    rule_string = f"{rule_string} {constraint[0]}≤{atribute}≤{constraint[1]}"
+                    rule_string = f"{rule_string} {constraint[0]:.4f}≤{atribute}≤{constraint[1]:.4f}"
             else:
                 rule_df = rule_df[rule_df[atribute].isin(constraint)]
                 if len(constraints_list) > 1 and idx != len(constraints_list) - 1:
@@ -129,3 +130,17 @@ class RulesPlotter:
         fitter = KaplanMeierFitter(label=rule_string)
         fitter.fit(rule_df[self.time_column], rule_df[self.events_column])
         fitter.plot_survival_function(ax=p_ax)
+
+
+def plot_topk_convergency(p_topk_best_fit: list, p_gen_best_fit: list):
+    gens_array = np.arange(len(p_gen_best_fit))
+    fig, ax = plt.subplots(figsize=(12, 10))
+    ax.plot(gens_array, p_gen_best_fit)
+    ax.plot(gens_array, p_topk_best_fit)
+    ax.grid()
+    ax.set_title("Score Convergency")
+    ax.legend(["Generations best score", "Top-K best score"])
+    ax.set_xlabel("Generations")
+    ax.set_ylabel("Score")
+
+    return fig
