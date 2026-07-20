@@ -1,11 +1,13 @@
 from dataclasses import dataclass
+import numpy as np
 import pandas as pd
 import pandas.api.types as ptypes
-import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from lifelines import KaplanMeierFitter
+
+plt.rcParams.update({"font.size": 20})
 
 POPULATION = "Baseline Population"
 COMPLEMENT = "Complement"
@@ -20,9 +22,9 @@ class RulesPlotter:
 
     def kaplan_meier(self, num_top: int) -> list[Figure]:
         """
-        Realiza o plot de Kaplan-Meier das regras registradas no Top-K
+        Plots Kaplan-Meier curves for the rules registered in the Top-K.
 
-        :param num_top: Números de regras que serão mostradas no plot de top-n melhores subgrupos registrados no top-k (Ex: num_top=3, compara as 3 melhores regras com a população/complemento)
+        :param num_top: Number of rules shown in the top-n plot.
         :type num_top: int
         """
         if num_top > 0:
@@ -41,10 +43,10 @@ class RulesPlotter:
 
         fitter = KaplanMeierFitter(label=POPULATION)
         fitter.fit(self.dataset[self.time_column], self.dataset[self.events_column])
-        fitter.plot_survival_function(ax=ax, linestyle="dashed", ci_show=False)
+        fitter.plot_survival_function(ax=ax, linestyle="dashed", color="#000000", ci_show=False)
 
-        for rule in self.rules[:p_num_top]:
-            self._plot_rules_curves(rule, ax)
+        for idx, rule in enumerate(self.rules[:p_num_top]):
+            self._plot_rules_curves(rule, ax, idx)
         ax.set_title(f"Top-{p_num_top} Kaplan-Meier Survival Curves")
         ax.set_xlabel("Time (e.g., months, days)")
         ax.set_ylabel("Survival Probability")
@@ -71,7 +73,7 @@ class RulesPlotter:
 
         return figures_list
 
-    def _plot_rules_curves(self, p_rule: list[list], p_ax: Axes):
+    def _plot_rules_curves(self, p_rule: list[list], p_ax: Axes, p_rule_idx: int):
         rule_string = ""
         rule_df = self.dataset.copy()
         atributes_list, constraints_list = p_rule
@@ -79,9 +81,9 @@ class RulesPlotter:
             if not ptypes.is_string_dtype(rule_df[atribute].dtype):
                 rule_df = rule_df[(rule_df[atribute] >= constraint[0]) & (rule_df[atribute] <= constraint[1])]
                 if len(constraints_list) > 1 and idx != len(constraints_list) - 1:
-                    rule_string = f"{rule_string} {constraint[0]}≤{atribute}≤{constraint[1]} ^"
+                    rule_string = f"{rule_string} {constraint[0]:.4f}≤{atribute}≤{constraint[1]:.4f} ^"
                 else:
-                    rule_string = f"{rule_string} {constraint[0]}≤{atribute}≤{constraint[1]}"
+                    rule_string = f"{rule_string} {constraint[0]:.4f}≤{atribute}≤{constraint[1]:.4f}"
             else:
                 rule_df = rule_df[rule_df[atribute].isin(constraint)]
                 if len(constraints_list) > 1 and idx != len(constraints_list) - 1:
@@ -89,9 +91,9 @@ class RulesPlotter:
                 else:
                     rule_string = f"{rule_string} {atribute}∈{set(constraint)}"
 
-        fitter = KaplanMeierFitter(label=rule_string)
+        fitter = KaplanMeierFitter(label=f"Rule {p_rule_idx}")
         fitter.fit(rule_df[self.time_column], rule_df[self.events_column])
-        fitter.plot_survival_function(ax=p_ax)
+        fitter.plot_survival_function(ax=p_ax, ci_show=False)
 
     def _plot_rule_and_complement(self, p_rule: list[list], p_ax: Axes):
         rule_string = ""
@@ -102,9 +104,9 @@ class RulesPlotter:
             if not ptypes.is_string_dtype(rule_df[atribute].dtype):
                 rule_df = rule_df[(rule_df[atribute] >= constraint[0]) & (rule_df[atribute] <= constraint[1])]
                 if len(constraints_list) > 1 and idx != len(constraints_list) - 1:
-                    rule_string = f"{rule_string} {constraint[0]}≤{atribute}≤{constraint[1]} ^"
+                    rule_string = f"{rule_string} {constraint[0]:.4f}≤{atribute}≤{constraint[1]:.4f} ^"
                 else:
-                    rule_string = f"{rule_string} {constraint[0]}≤{atribute}≤{constraint[1]}"
+                    rule_string = f"{rule_string} {constraint[0]:.4f}≤{atribute}≤{constraint[1]:.4f}"
             else:
                 rule_df = rule_df[rule_df[atribute].isin(constraint)]
                 if len(constraints_list) > 1 and idx != len(constraints_list) - 1:
@@ -130,15 +132,15 @@ class RulesPlotter:
         fitter.plot_survival_function(ax=p_ax)
 
 
-if __name__ == "__main__":
-    df = pd.read_parquet("datasets/cancer.parquet")
-    rules = [
-        [["ph-ecog"], [["3.0", "0.0"]]],
-        [["age", "sex"], [[np.float64(54.0), np.float64(82.0)], ["1", "2"]]],
-    ]
+def plot_topk_convergency(p_topk_best_fit: list, p_gen_best_fit: list):
+    gens_array = np.arange(len(p_gen_best_fit))
+    fig, ax = plt.subplots(figsize=(12, 10))
+    ax.plot(gens_array, p_gen_best_fit)
+    ax.plot(gens_array, p_topk_best_fit)
+    ax.grid()
+    ax.set_title("Score Convergency")
+    ax.legend(["Generations best score", "Top-K best score"])
+    ax.set_xlabel("Generations")
+    ax.set_ylabel("Score")
 
-    plotter = RulesPlotter(df, rules, events_column="status", time_column="time")
-    plot_list = plotter.kaplan_meier(2)
-    for i, plot in enumerate(plot_list):
-        plot.show()
-        plot.savefig(f"image{i}")
+    return fig

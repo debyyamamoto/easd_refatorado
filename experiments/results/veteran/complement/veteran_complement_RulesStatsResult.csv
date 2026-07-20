@@ -1,0 +1,2 @@
+,mean_score,mean_runtime,mean_rule_size,mean_cpu_percent,peak_cpu_percent,mean_ram_mb,peak_ram_mb
+0,0.9351412405404127±0.008565645818911925,199.1±50.94,1.99±0.1,8.24±0.04,10.57±0.43,206.94±0.27,206.96±0.26

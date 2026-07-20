@@ -1,9 +1,10 @@
+import os
 import time
 import math
 import copy
 from random import seed
-from typing import List, Tuple, Any
 from heapq import heapify, heappush, heappop
+from typing import Literal
 from rich.console import Console
 import numpy as np
 import pandas as pd
@@ -12,16 +13,18 @@ from .population import PopulationGenerator
 from .evaluation import RuleEvaluator
 from .operators import GeneticOperators
 from .dataset import Dataset
-from .visualization import RulesPlotter
+from .visualization import RulesPlotter, plot_topk_convergency
+from .performance import ProcessResourceMonitor
 
 EPSILON = 1e-12
 DEFAULT_CROSSOVER_RATE = 60
 DEFAULT_MUTATION_RATE = 40
 RATES_CHANGE_FATOR = 20
+RATEPOLICY = Literal["adaptive", "fixed"]
 console = Console()
 
 
-class EASD:
+class MEASE:
     def __init__(
         self,
         data: pd.DataFrame,
@@ -38,11 +41,19 @@ class EASD:
         ksize,
         plot_n_rules: int,
         coverage_threshold: float = 0.8,
+        debug_performance: bool = False,
+        rate_policy: RATEPOLICY = "adaptive",
     ):
+        if rate_policy not in ("adaptive", "fixed"):
+            raise ValueError("rate_policy must be either 'adaptive' or 'fixed'.")
+
         self.survival_event_col = event_col
         self.survival_time_col = time_col
+        self.rate_policy = rate_policy
         self.crossover_rate = DEFAULT_CROSSOVER_RATE
         self.mutation_rate = DEFAULT_MUTATION_RATE
+        self.initial_crossover_rate = DEFAULT_CROSSOVER_RATE
+        self.initial_mutation_rate = DEFAULT_MUTATION_RATE
         self.max_generations = max_generations
         self.population_size = population_size
         self.no_improvement_counter = 0
@@ -64,6 +75,7 @@ class EASD:
         self.top_n_plot = plot_n_rules
         self.coverage_threshold = coverage_threshold
         seed(self.seed)
+        self.debug_performance = debug_performance
 
     def _get_mask(self, rule: list[list]):
         mask = np.ones(len(self.dataset_obj._original_data), dtype=bool)
@@ -91,7 +103,7 @@ class EASD:
         return intersection / minimum if minimum > 0 else 0.0
 
     def _is_redundant(self, new_rule, new_fitness):
-        # caso base: verifica se o grupo de top-k está vazio
+        # Base case: the top-k group is empty.
         if not self.best_by_key:
             return False, self._get_mask(new_rule)
         new_mask = self._get_mask(new_rule)
@@ -158,6 +170,9 @@ class EASD:
             return -1
 
     def _update_mutation_crossover_rates(self):
+        if self.rate_policy == "fixed":
+            return
+
         if (
             self.prev_best_by_key == self.best_by_key
             and self.mutation_rate <= 80
@@ -175,28 +190,28 @@ class EASD:
             self.crossover_rate += RATES_CHANGE_FATOR
 
     def _check_stop(self, gen_count):
-        if self.prev_best_by_key == {}:
-            self.prev_best_by_key = self.best_by_key.copy()
+        if gen_count >= self.max_generations:
+            return False
 
-            return True
         if self.restart_counter_consecutive >= self.max_pop_restarts:
             print(f"\n{'='*70}")
             console.log(
-                f"  Critério de parada com {self.max_pop_restarts} reinicializações alcançado.",
+                f"  Stop criterion reached after {self.max_pop_restarts} population restarts.",
                 style="bold green",
             )
             print(f"\n{'='*70}")
 
             return False
 
-        elif gen_count == self.max_generations:
-
-            return False
-        else:
-            self._update_mutation_crossover_rates()
+        if self.prev_best_by_key == {}:
             self.prev_best_by_key = self.best_by_key.copy()
 
             return True
+
+        self._update_mutation_crossover_rates()
+        self.prev_best_by_key = self.best_by_key.copy()
+
+        return True
 
     def _evaluate_improvement(self, population, fitness_list, restart_prct, dataset):
         if self.prev_best_by_key == self.best_by_key and self.mutation_rate == 100:
@@ -277,7 +292,7 @@ class EASD:
 
     def _update_current_rule(self, p_rule, p_previous, p_individual, p_fitness):
         """
-        Atualiza uma regra que os atributos já estão na lista de top-ks se os invervalos conferem um fitness melhor
+        Updates an existing top-k rule when its intervals improve the fitness.
         """
         previous_fit, _ = p_previous
         if p_fitness > previous_fit + EPSILON:
@@ -316,25 +331,34 @@ class EASD:
 
     def run(self):
         start_time = time.time()
+        pid = os.getpid()
+        profiler = ProcessResourceMonitor(pid)
+        if self.debug_performance:
+            profiler.start()
 
         dataset_x = self.dataset_obj.data
 
         mean_fitness_history = []
         best_fitness_history = []
         print(f"\n{'='*70}")
-        console.print(f"--- Iniciando Busca Top-K ---")
+        console.print("--- Starting Top-K Search ---")
         print(f"\n{'='*70}")
-        console.print(f"Configuração:")
-        console.print(f"   • População: {self.population_size}")
-        console.print(f"   • Gerações: {self.max_generations}")
-        console.print(f"   • Top-K: {self.ksize} melhores regras")
+        console.print("Configuration:")
+        console.print(f"   - Population: {self.population_size}")
+        console.print(f"   - Generations: {self.max_generations}")
+        console.print(f"   - Top-K: {self.ksize} best rules")
+        console.print(
+            f"   - Rate policy: {self.rate_policy} "
+            f"(crossover={self.crossover_rate}%, mutation={self.mutation_rate}%)"
+        )
         print(f"{'='*70}")
 
         gen_count = 0
         population = self.generator.gen_population(self.population_size, dataset_x)
         gen_mean_fitness, gen_best_fitness = [], []
+        best_topk_score_register, best_gen_score_register = [], []
 
-        with console.status("[bold green] Evoluindo gerações...") as status:
+        with console.status("[bold green] Evolving generations...") as status:
             while self._check_stop(gen_count):
                 fitness_list = self.evaluation.get_fitness(population, dataset_x)
 
@@ -347,6 +371,8 @@ class EASD:
                 fitness_list = self.evaluation.get_fitness(population, dataset_x)
 
                 self._update_top_k(population, fitness_list)
+                best_topk_score_register.append(next(reversed(self.best_by_key.values()))[0])
+                best_gen_score_register.append(np.max(fitness_list))
 
                 if fitness_list:
                     mean_fit = np.mean(fitness_list)
@@ -355,12 +381,12 @@ class EASD:
                     gen_best_fitness.append(best_fit)
                     if (gen_count + 1) % 50 == 0:
                         console.log(
-                            f"   Gen {gen_count + 1:3d}: Melhor={best_fit:.4f} | "
-                            f"Média={mean_fit:.4f} | Top-K={len(self.best_by_key)}/{self.ksize}"
+                            f"   Gen {gen_count + 1:3d}: Best={best_fit:.4f} | "
+                            f"Mean={mean_fit:.4f} | Top-K={len(self.best_by_key)}/{self.ksize}"
                         )
                 else:
                     console.print(
-                        f"⚠️ AVISO G{gen_count}: População vazia - Encerrando execução.",
+                        f"WARNING G{gen_count}: empty population - stopping execution.",
                         style="bold red",
                     )
                     break
@@ -379,14 +405,14 @@ class EASD:
             if gen_best_fitness:
                 final_best = gen_best_fitness[-1]
                 console.log(
-                    f"   ✓ Concluída: {gen_count} gerações | " f"Melhor Fitness Final = {final_best:.4f}\n",
+                    f"   Completed: {gen_count} generations | Final Best Fitness = {final_best:.4f}\n",
                     style="bold green",
                 )
         print(f"\n{'='*70}")
-        console.log(f" Finalizou em {time.time() - start_time:.2f} s", style="bold green")
+        console.log(f" Finished in {time.time() - start_time:.2f} s", style="bold green")
         print(f"{'='*70}")
 
-        top_k_values = list(self.best_by_key.values())  # Lista de tuplas (fitness, regra)
+        top_k_values = list(self.best_by_key.values())  # List of tuples (fitness, rule).
 
         if top_k_values:
             fitnesses = [v[0] for v in top_k_values]
@@ -394,12 +420,12 @@ class EASD:
             best_fit = np.max(fitnesses)
             worst_fit = np.min(fitnesses)
             std_fit = np.std(fitnesses)
-            console.print(f"\n Estatísticas das Top-{len(top_k_values)} Regras:")
-            console.print(f"   • Média Fitness: {avg_fit:.4f} (±{std_fit:.4f})")
-            console.print(f"   • Melhor: {best_fit:.4f}")
-            console.print(f"   • Pior: {worst_fit:.4f}")
+            console.print(f"\n Top-{len(top_k_values)} Rule Statistics:")
+            console.print(f"   - Mean Fitness: {avg_fit:.4f} (+/-{std_fit:.4f})")
+            console.print(f"   - Best: {best_fit:.4f}")
+            console.print(f"   - Worst: {worst_fit:.4f}")
         else:
-            console.log("\n Nenhuma regra válida encontrada!", style="bold red")
+            console.log("\n No valid rules found.", style="bold red")
             avg_fit, best_fit, worst_fit, std_fit = 0.0, 0.0, 0.0, 0.0
 
         final_metrics = [avg_fit, best_fit, worst_fit, std_fit]
@@ -418,24 +444,43 @@ class EASD:
         total_time = time.time() - start_time
         rules_qtd = len(final_rules_found)
         mean_size = np.mean(rules_sizes) if rules_sizes else 0.0
-        console.print(f"\n Resultados Finais:")
-        console.print(f"   • Regras encontradas: {rules_qtd}")
-        console.print(f"   • Tamanho médio: {mean_size:.2f} atributos")
+        console.print("\n Final Results:")
+        console.print(f"   - Rules found: {rules_qtd}")
+        console.print(f"   - Mean size: {mean_size:.2f} attributes")
         print(f"{'='*70}\n")
         detailed_rules_df = pd.DataFrame({"Rule_Obj": [str(r) for r in final_rules_found], "Rule_Score": rules_scores})
         figures_list = RulesPlotter(
             self.dataset_obj._original_data, final_rules_found, self.survival_event_col, self.survival_time_col
         ).kaplan_meier(self.top_n_plot)
+        figures_list.append(plot_topk_convergency(best_topk_score_register, best_gen_score_register))
 
-        # Info: Resumo básico
-        info_df = pd.DataFrame(
-            {
-                "Qtd_Regras": [rules_qtd],
-                "Tempo_Total": [total_time],
-                "Tamanho_Medio": [mean_size],
-                "Melhor_Fitness": [final_metrics[1]],
-            }
-        )
+        # Info: basic summary.
+        common_info = {
+            "rules_count": [rules_qtd],
+            "total_time": [total_time],
+            "mean_size": [mean_size],
+            "best_fitness": [final_metrics[1]],
+            "rate_policy": [self.rate_policy],
+            "initial_crossover_rate": [self.initial_crossover_rate],
+            "initial_mutation_rate": [self.initial_mutation_rate],
+            "final_crossover_rate": [self.crossover_rate],
+            "final_mutation_rate": [self.mutation_rate],
+        }
+        if self.debug_performance:
+            performance_stats = profiler.stop()
+            info_df = pd.DataFrame(
+                {
+                    **common_info,
+                    "cpu_mean_percent": [performance_stats.cpu_mean_percent],
+                    "cpu_peak_percent": [performance_stats.cpu_peak_percent],
+                    "ram_mean_mb": [performance_stats.ram_mean_mb],
+                    "ram_peak_mb": [performance_stats.ram_peak_mb],
+                    "ram_incremental_peak_mb": [performance_stats.ram_incremental_peak_mb],
+                    "ram_baseline_mb": [performance_stats.ram_baseline_mb],
+                }
+            )
+        else:
+            info_df = pd.DataFrame(common_info)
 
         return (
             final_metrics,
