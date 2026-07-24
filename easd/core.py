@@ -78,19 +78,7 @@ class MEASE:
         self.debug_performance = debug_performance
 
     def _get_mask(self, rule: list[list]):
-        mask = np.ones(len(self.dataset_obj._original_data), dtype=bool)
-        attributes, intervals = rule[0], rule[1]
-
-        for attr_idx, interval in zip(attributes, intervals):
-            col = self.dataset_obj.get_col_name(attr_idx)
-            s = self.dataset_obj._original_data[col]
-
-            if self.dataset_obj._original_data[col].dtype == "string":
-                mask &= s.isin(interval)
-            else:
-                mask &= (s >= interval[0]) & (s <= interval[1])
-
-        return list(mask)
+        return self.dataset_obj.get_rule_mask(rule)
 
     def _jaccard_test(self, mask1, mask2):
         intersection = np.logical_and(mask1, mask2).sum()

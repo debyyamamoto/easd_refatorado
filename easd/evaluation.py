@@ -25,21 +25,7 @@ class RuleEvaluator:
         # Validate whether the rule follows the expected format: indices and values.
         if not rule or len(rule) < 2 or len(rule[0]) != len(rule[1]):
             return []
-        indices, values = rule[0], rule[1]
-        n_rows = dataset.shape[0]
-
-        mask = np.ones(n_rows, dtype=bool)
-
-        for idx, val in zip(indices, values):
-            col_data = dataset[:, idx]
-            if isinstance(val[0], str):
-                if len(val) > 1:
-                    row_mask = np.isin(col_data, val)
-                else:
-                    row_mask = col_data == val[0]
-            else:
-                row_mask = (col_data >= val[0]) & (col_data <= val[1])
-            mask &= row_mask
+        mask = self.dataset_obj.get_rule_mask(rule)
         return np.where(mask)[0].tolist()
 
     def fitness(self, rule, dataset_x):

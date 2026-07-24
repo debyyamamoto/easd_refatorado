@@ -37,16 +37,59 @@ class Dataset:
         data.drop(columns=to_drop, inplace=True)
 
         col_names = list(data.columns.values)
-        self.attr_values = dict.fromkeys(col_names)
-        for name in col_names:
-            self.attr_values[name] = list(set(pd.unique(data[name])))
-
+        
+        # 1º: PRECISAMOS criar o _col_index PRIMEIRO, pois as matrizes vão usá-lo
         self._col_index = dict.fromkeys(col_names)
         for name in col_names:
             self._col_index[name] = data.columns.get_loc(name)
 
+        # 2º: PRECISAMOS criar o attr_values PRIMEIRO, pois os codebooks vão usá-lo
+        self.attr_values = dict.fromkeys(col_names)
+        for name in col_names:
+            self.attr_values[name] = list(set(pd.unique(data[name])))
+
+        # 3º: Agora sim separamos o que é numérico e o que é categórico
+        numeric_cols = [c for c in col_names if data[c].dtype != "string"]
+        categorical_cols = [c for c in col_names if data[c].dtype == "string"]
+
+        # 4º: Criamos a matriz numérica (você havia esquecido essa linha!)
+        self.numeric_matrix = data[numeric_cols].to_numpy(dtype=np.float64)
+
+        # 5º: Criamos os codebooks usando o _col_index e attr_values que geramos lá em cima
+        self.categorical_codebooks = {
+            self._col_index[c]: {v: i for i, v in enumerate(self.attr_values[c])}
+            for c in categorical_cols
+        }
+
+        # 6º: Criamos a matriz categórica
+        self.categorical_matrix = np.column_stack([
+            data[c].map(self.categorical_codebooks[self._col_index[c]]).to_numpy(dtype=np.int32)
+            for c in categorical_cols
+        ]) if categorical_cols else np.empty((data.shape[0], 0), dtype=np.int32)
+
+        # 7º: Criamos o roteador local
+        self.col_local_index = {}  # índice global -> (é_numérico, índice local na matriz)
+        for local_i, c in enumerate(numeric_cols):
+            self.col_local_index[self._col_index[c]] = (True, local_i)
+        for local_i, c in enumerate(categorical_cols):
+            self.col_local_index[self._col_index[c]] = (False, local_i)
+
+        # Mantém a data original como fallback se algo antigo do código usar
         self.data = np.array(data.values)
         return
+
+    def get_rule_mask(self, rule: list[list]) -> np.ndarray:
+        mask = np.ones(self.size, dtype=bool)
+        for attr_idx, interval in zip(rule[0], rule[1]):
+            is_numeric, local_idx = self.col_local_index[attr_idx]
+            if is_numeric:
+                col = self.numeric_matrix[:, local_idx]
+                mask &= (col >= interval[0]) & (col <= interval[1])
+            else:
+                codebook = self.categorical_codebooks[attr_idx]
+                codes = [codebook.get(v, -1) for v in interval]
+                mask &= np.isin(self.categorical_matrix[:, local_idx], codes)
+        return mask
 
     def _binarize_events(self, data: pd.DataFrame, event_col: str):
         data[event_col] = data[event_col].replace(min(data[event_col]), 0)
