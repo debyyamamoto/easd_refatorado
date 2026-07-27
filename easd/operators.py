@@ -1,6 +1,6 @@
-import pandas as pd
 import random as rd
 import copy
+import numpy as np
 
 
 class GeneticOperators:
@@ -61,7 +61,7 @@ class GeneticOperators:
         if mutation_option == 1:
             for i in range(len(discrete_atr)):
                 new_discrete.append(discrete_atr[i])
-            unique_values = pd.Series(attribute_domain).unique()
+            unique_values = np.unique(attribute_domain)
             if len(new_discrete) < len(unique_values):
                 while True:
                     idx_discr = rd.randint(0, len(unique_values) - 1)
@@ -92,7 +92,6 @@ class GeneticOperators:
         return new_discrete
 
     def mutation(self, population, prct, fitness_list, dataset):
-        df = pd.DataFrame(dataset)
         mutated_population = copy.deepcopy(population)
 
         for mutations in range(len(mutated_population)):
@@ -133,7 +132,7 @@ class GeneticOperators:
                             if type(rule[1][index][0]) == str:
                                 mutation_option = rd.randint(1, 3)
                                 rule[1][index] = self.to_mutate_discrete(
-                                    rule[1][index], df[col_index].values.tolist(), mutation_option
+                                    rule[1][index], dataset[:, col_index], mutation_option
                                 )
                             else:
                                 mutation_option = rd.randint(1, 9)
@@ -145,7 +144,7 @@ class GeneticOperators:
                             if type(rule[1][index][0]) == str:
                                 mutation_option = rd.randint(1, 2)
                                 rule[1][index] = self.to_mutate_discrete(
-                                    rule[1][index], df[col_index].values.tolist(), mutation_option
+                                    rule[1][index], dataset[:, col_index], mutation_option
                                 )
                             else:
                                 mutation_option = rd.randint(1, 8)

@@ -37,6 +37,8 @@ Results are written to `results/<dataset>/<baseline>/`.
 | `--restart_pct` | no | Restarted population percentage | `10` |
 | `-comp`, `--comparacao` | no | `complement` or `population` baseline | `complement` |
 | `-a`, `--alpha` | no | Fitness alpha weight | `0.5` |
+| `--score_metric` | no | `legacy_logrank`, `fast_logrank`, `km_cvm`, or `km_abc` | `legacy_logrank` |
+| `--km_time_bins` | no | Maximum KM time grid size for `km_cvm`/`km_abc`; use `0` for exact event-time grid | `512` |
 | `-exe`, `--executions` | no | Independent executions | `1` |
 | `-k`, `--ksize` | no | Top-K rule rank size | `10` |
 | `-plt`, `--plt_rank` | no | Save top-N plots for a single execution | `0` |

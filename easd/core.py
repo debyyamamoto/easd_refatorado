@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from .population import PopulationGenerator
-from .evaluation import RuleEvaluator
+from .evaluation import RuleEvaluator, ScoreMetric
 from .operators import GeneticOperators
 from .dataset import Dataset
 from .visualization import RulesPlotter, plot_topk_convergency
@@ -43,6 +43,8 @@ class MEASE:
         coverage_threshold: float = 0.8,
         debug_performance: bool = False,
         rate_policy: RATEPOLICY = "adaptive",
+        score_metric: ScoreMetric = "legacy_logrank",
+        km_time_bins: int | None = 512,
     ):
         if rate_policy not in ("adaptive", "fixed"):
             raise ValueError("rate_policy must be either 'adaptive' or 'fixed'.")
@@ -70,7 +72,15 @@ class MEASE:
         self.dataset_obj = Dataset(data, time_col, event_col)
         self.generator = PopulationGenerator()
         self.alpha = alpha
-        self.evaluation = RuleEvaluator(self.dataset_obj, comparacao, self.alpha)
+        self.score_metric = score_metric
+        self.km_time_bins = km_time_bins
+        self.evaluation = RuleEvaluator(
+            self.dataset_obj,
+            comparacao,
+            self.alpha,
+            score_metric=self.score_metric,
+            km_time_bins=self.km_time_bins,
+        )
         self.operators = GeneticOperators(self.evaluation, self._get_best)
         self.top_n_plot = plot_n_rules
         self.coverage_threshold = coverage_threshold
@@ -86,11 +96,11 @@ class MEASE:
             s = self.dataset_obj._original_data[col]
 
             if self.dataset_obj._original_data[col].dtype == "string":
-                mask &= s.isin(interval)
+                mask &= s.isin(interval).to_numpy()
             else:
-                mask &= (s >= interval[0]) & (s <= interval[1])
+                mask &= ((s >= interval[0]) & (s <= interval[1])).to_numpy()
 
-        return list(mask)
+        return mask
 
     def _jaccard_test(self, mask1, mask2):
         intersection = np.logical_and(mask1, mask2).sum()
@@ -98,7 +108,7 @@ class MEASE:
         return intersection / union if union > 0.0 else 0.0
 
     def _overlap_coefficient(self, mask1, mask2):
-        intersection = np.logical_and(mask1, mask2)
+        intersection = np.logical_and(mask1, mask2).sum()
         minimum = min(mask1.sum(), mask2.sum())
         return intersection / minimum if minimum > 0 else 0.0
 
@@ -347,6 +357,7 @@ class MEASE:
         console.print(f"   - Population: {self.population_size}")
         console.print(f"   - Generations: {self.max_generations}")
         console.print(f"   - Top-K: {self.ksize} best rules")
+        console.print(f"   - Score metric: {self.score_metric}")
         console.print(
             f"   - Rate policy: {self.rate_policy} "
             f"(crossover={self.crossover_rate}%, mutation={self.mutation_rate}%)"
@@ -460,6 +471,8 @@ class MEASE:
             "total_time": [total_time],
             "mean_size": [mean_size],
             "best_fitness": [final_metrics[1]],
+            "score_metric": [self.score_metric],
+            "km_time_bins": [self.km_time_bins if self.km_time_bins is not None else 0],
             "rate_policy": [self.rate_policy],
             "initial_crossover_rate": [self.initial_crossover_rate],
             "initial_mutation_rate": [self.initial_mutation_rate],

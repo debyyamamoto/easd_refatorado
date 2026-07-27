@@ -1,6 +1,7 @@
 import sys
 import argparse
 from pathlib import Path
+from easd.evaluation import SCORE_METRICS
 from easd.runner import RunConfig, run_dataset
 
 
@@ -37,6 +38,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Baseline group for the log-rank test.",
     )
     parser.add_argument("-a", "--alpha", type=float, default=0.5, help="Fitness alpha weight.")
+    parser.add_argument(
+        "--score_metric",
+        choices=SCORE_METRICS,
+        default="legacy_logrank",
+        help=(
+            "Fitness discrepancy metric. 'legacy_logrank' uses statsmodels survdiff; "
+            "'fast_logrank' uses a precomputed log-rank proxy; 'km_cvm' and 'km_abc' "
+            "use weighted Kaplan-Meier curve distances."
+        ),
+    )
+    parser.add_argument(
+        "--km_time_bins",
+        type=int,
+        default=512,
+        help="Maximum time grid size for km_cvm/km_abc. Use 0 for exact event-time grid.",
+    )
     parser.add_argument(
         "--rate_policy",
         choices=["adaptive", "fixed"],
@@ -79,6 +96,8 @@ def config_from_args(args: argparse.Namespace) -> RunConfig:
         restart_pct=args.restart_pct,
         comparacao=args.comparacao,
         alpha=args.alpha,
+        score_metric=args.score_metric,
+        km_time_bins=None if args.km_time_bins <= 0 else args.km_time_bins,
         ksize=args.ksize,
         plot_rank=args.plt_rank,
         threshold=args.threshold,
