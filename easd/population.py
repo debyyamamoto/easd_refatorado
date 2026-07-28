@@ -1,7 +1,4 @@
 import random as rd
-import copy
-import pandas as pd
-
 
 class PopulationGenerator:
     def gen_interval(self, continuous_attribute):
@@ -14,7 +11,7 @@ class PopulationGenerator:
 
         return [lower_interval, upper_interval]
 
-    def gen_ind(self, dataset, df, row_size):
+    def gen_ind(self, dataset, row_size):
         individual = [[], []]
 
         row = rd.randint(0, len(dataset) - 1)
@@ -37,13 +34,11 @@ class PopulationGenerator:
         return individual
 
     def gen_population(self, population_size, dataset):
-        dataset_copy = copy.deepcopy(dataset)
         population = []
-        df = pd.DataFrame(dataset_copy)
         row_size = len(dataset[0])
 
         for i in range(population_size):
-            individual = self.gen_ind(dataset_copy, df, row_size)
+            individual = self.gen_ind(dataset, row_size)
             population.append(individual)
 
         return population
