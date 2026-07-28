@@ -218,3 +218,7 @@ __marimo__/
 # Data files
 *.png
 *.txt
+
+*.prof
+experiments/artificial_datsets/generated/
+results_teste/
