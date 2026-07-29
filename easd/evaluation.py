@@ -1,7 +1,7 @@
 import numpy as np
 from .dataset import Dataset
 from scipy.stats import chi2
-
+import hashlib
 
 class RuleEvaluator:
     def __init__(self, dataset_obj: Dataset, comparacao, alpha):
@@ -16,6 +16,7 @@ class RuleEvaluator:
         events = dataset_obj._original_data[dataset_obj._event_name].to_numpy(dtype=np.float64)
         self._survival_times = times
         self._events = events
+        self._fitness_cache: dict[bytes, float] = {}
 
         ## Pre compute the log-rank values 
         # chronological ordering
@@ -93,14 +94,14 @@ class RuleEvaluator:
 
         mask = np.zeros(self.dataset_obj.size, dtype=bool)
         mask[rule_group_indices] = True
-
+        cache_key = hashlib.blake2b(np.packbits(mask).tobytes(), digest_size=16).digest()
+        cached = self._fitness_cache.get(cache_key)
+        if cached is not None:
+            return cached
         try:
             n_1j, d_1j = self._subgroup_risk_components(mask)
 
             if self.comparacao == "population":
-                # Réplica do ESMAM original: "pop" é a população inteira, que já
-                # contém o subgrupo -- ele entra contado duas vezes no risco
-                # combinado. Estatisticamente questionável, mantido por fidelidade.
                 n_j = self._n_j + n_1j
                 d_j = self._d_j + d_1j
             else:  # "complement"
@@ -113,7 +114,9 @@ class RuleEvaluator:
         except Exception:
             p_value = 1.0
 
-        return (1 - p_value) * (relative_support**self.alpha)
+        fitness_value = (1 - p_value) * (relative_support**self.alpha)
+        self._fitness_cache[cache_key] = fitness_value
+        return fitness_value
 
     def get_fitness(self, population, dataset_x):
         fitness_list = []
