@@ -37,44 +37,36 @@ class Dataset:
         data.drop(columns=to_drop, inplace=True)
 
         col_names = list(data.columns.values)
-        
-        # 1º: PRECISAMOS criar o _col_index PRIMEIRO, pois as matrizes vão usá-lo
+    
         self._col_index = dict.fromkeys(col_names)
         for name in col_names:
             self._col_index[name] = data.columns.get_loc(name)
 
-        # 2º: PRECISAMOS criar o attr_values PRIMEIRO, pois os codebooks vão usá-lo
         self.attr_values = dict.fromkeys(col_names)
         for name in col_names:
             self.attr_values[name] = list(set(pd.unique(data[name])))
 
-        # 3º: Agora sim separamos o que é numérico e o que é categórico
         numeric_cols = [c for c in col_names if data[c].dtype != "string"]
         categorical_cols = [c for c in col_names if data[c].dtype == "string"]
 
-        # 4º: Criamos a matriz numérica (você havia esquecido essa linha!)
         self.numeric_matrix = data[numeric_cols].to_numpy(dtype=np.float64)
 
-        # 5º: Criamos os codebooks usando o _col_index e attr_values que geramos lá em cima
         self.categorical_codebooks = {
             self._col_index[c]: {v: i for i, v in enumerate(self.attr_values[c])}
             for c in categorical_cols
         }
 
-        # 6º: Criamos a matriz categórica
         self.categorical_matrix = np.column_stack([
             data[c].map(self.categorical_codebooks[self._col_index[c]]).to_numpy(dtype=np.int32)
             for c in categorical_cols
         ]) if categorical_cols else np.empty((data.shape[0], 0), dtype=np.int32)
 
-        # 7º: Criamos o roteador local
-        self.col_local_index = {}  # índice global -> (é_numérico, índice local na matriz)
+        self.col_local_index = {}  
         for local_i, c in enumerate(numeric_cols):
             self.col_local_index[self._col_index[c]] = (True, local_i)
         for local_i, c in enumerate(categorical_cols):
             self.col_local_index[self._col_index[c]] = (False, local_i)
 
-        # Mantém a data original como fallback se algo antigo do código usar
         self.data = np.array(data.values)
         return
 
