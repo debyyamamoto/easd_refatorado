@@ -2,12 +2,17 @@ import pandas as pd
 import random as rd
 import copy
 
-
 class GeneticOperators:
     def __init__(self, evaluator, get_best_func):
         self.evaluator = evaluator
         self._get_best = get_best_func
+        self._column_values_cache = {}
 
+    def _column_values(self, dataset, col_index):
+        if col_index not in self._column_values_cache:
+            self._column_values_cache[col_index] = dataset[:, col_index].tolist()
+        return self._column_values_cache[col_index]
+    
     def to_mutate_continuous(self, interval, usage_prct, mutation_option):
         """
         Mutates numeric attributes.
@@ -91,8 +96,7 @@ class GeneticOperators:
 
         return new_discrete
 
-    def mutation(self, population, prct, fitness_list, dataset):
-        df = pd.DataFrame(dataset)
+    def mutation(self, population, prct, fitness_list, dataset): 
         mutated_population = copy.deepcopy(population)
 
         for mutations in range(len(mutated_population)):
@@ -133,7 +137,7 @@ class GeneticOperators:
                             if type(rule[1][index][0]) == str:
                                 mutation_option = rd.randint(1, 3)
                                 rule[1][index] = self.to_mutate_discrete(
-                                    rule[1][index], df[col_index].values.tolist(), mutation_option
+                                    rule[1][index], self._column_values(dataset, col_index), mutation_option
                                 )
                             else:
                                 mutation_option = rd.randint(1, 9)
@@ -145,7 +149,7 @@ class GeneticOperators:
                             if type(rule[1][index][0]) == str:
                                 mutation_option = rd.randint(1, 2)
                                 rule[1][index] = self.to_mutate_discrete(
-                                    rule[1][index], df[col_index].values.tolist(), mutation_option
+                                    rule[1][index], self._column_values(dataset, col_index), mutation_option
                                 )
                             else:
                                 mutation_option = rd.randint(1, 8)

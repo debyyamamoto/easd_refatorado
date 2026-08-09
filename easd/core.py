@@ -78,19 +78,7 @@ class MEASE:
         self.debug_performance = debug_performance
 
     def _get_mask(self, rule: list[list]):
-        mask = np.ones(len(self.dataset_obj._original_data), dtype=bool)
-        attributes, intervals = rule[0], rule[1]
-
-        for attr_idx, interval in zip(attributes, intervals):
-            col = self.dataset_obj.get_col_name(attr_idx)
-            s = self.dataset_obj._original_data[col]
-
-            if self.dataset_obj._original_data[col].dtype == "string":
-                mask &= s.isin(interval)
-            else:
-                mask &= (s >= interval[0]) & (s <= interval[1])
-
-        return list(mask)
+        return self.dataset_obj.get_rule_mask(rule)
 
     def _jaccard_test(self, mask1, mask2):
         intersection = np.logical_and(mask1, mask2).sum()
@@ -123,42 +111,38 @@ class MEASE:
         return False, new_mask
 
     def _adjust_interval(self, rule, dataset):
-        df = pd.DataFrame(dataset)
         for i in range(len(rule[0])):
             if type(rule[1][i][0]) == str:
-                pass
-            else:
-                min_val = np.min(df[rule[0][i]])
-                max_val = np.max(df[rule[0][i]])
-                c_min, c_max = True, True
+                continue
+            col_index = rule[0][i]
+            col_values = np.asarray(dataset[:, col_index], dtype=np.float64)
+            min_val = col_values.min()
+            max_val = col_values.max()
+            c_min, c_max = True, True
 
-                if rule[1][i][0] < min_val:
-                    rule[1][i][0] = min_val
-                    c_min = False
+            if rule[1][i][0] < min_val:
+                rule[1][i][0] = min_val
+                c_min = False
 
-                if rule[1][i][1] > max_val:
-                    rule[1][i][1] = max_val
-                    c_max = False
+            if rule[1][i][1] > max_val:
+                rule[1][i][1] = max_val
+                c_max = False
 
-                int_max_val = rule[1][i][1]
-                idx = rule[0][i]
+            int_max_val = rule[1][i][1]
 
-                if c_max:
-                    to_max_ordered = df[idx].apply(lambda x: abs(x - int_max_val)).sort_values()
-                    indexes = to_max_ordered.index[:1]
-                    rule[1][i][1] = df[idx].loc[indexes[0]]
+            if c_max:
+                nearest_idx = np.argmin(np.abs(col_values - int_max_val))
+                rule[1][i][1] = col_values[nearest_idx]
 
-                if c_min:
-                    int_min_val = rule[1][i][0]
-                    to_min_ordered = df[idx].apply(lambda x: abs(x - int_min_val)).sort_values()
-                    indexes = to_min_ordered.index[: len(to_min_ordered)]
-                    for j in range(len(to_min_ordered)):
-                        new_min = df[idx].loc[indexes[j]]
-                        if new_min < int_max_val:
-                            rule[1][i][0] = new_min
-                            break
+            if c_min:
+                int_min_val = rule[1][i][0]
+                valid_mask = col_values < int_max_val
+                if np.any(valid_mask):
+                    candidates = col_values[valid_mask]
+                    nearest_idx = np.argmin(np.abs(candidates - int_min_val))
+                    rule[1][i][0] = candidates[nearest_idx]
+
         rule = self._label_rules(rule)
-
         return rule
 
     def _get_best(self, population, fitness_list):
