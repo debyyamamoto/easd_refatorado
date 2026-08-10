@@ -21,7 +21,7 @@ from easd.runner import RunConfig, run_dataset
 DEFAULT_OUTPUT_DIR = Path("experiments/artificial_datsets/score_metric_benchmark")
 DEFAULT_DATASET_DIR = DEFAULT_OUTPUT_DIR / "datasets"
 DEFAULT_SUBJECTS = [10_000, 50_000]
-DEFAULT_METRICS = ["legacy_logrank", "fast_logrank", "km_cvm", "km_abc"]
+DEFAULT_METRICS = ["legacy_logrank", "fast_logrank", "km_cvm", "km_abc", "mdir2"]
 
 
 def build_parser() -> argparse.ArgumentParser:

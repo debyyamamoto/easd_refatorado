@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from .population import PopulationGenerator
-from .evaluation import RuleEvaluator, ScoreMetric
+from .evaluation import RuleEvaluator
 from .operators import GeneticOperators
 from .dataset import Dataset
 from .visualization import RulesPlotter, plot_topk_convergency
@@ -43,7 +43,7 @@ class MEASE:
         coverage_threshold: float = 0.8,
         debug_performance: bool = False,
         rate_policy: RATEPOLICY = "adaptive",
-        score_metric: ScoreMetric = "legacy_logrank",
+        score_metric: str = "legacy_logrank",
         km_time_bins: int | None = 512,
     ):
         if rate_policy not in ("adaptive", "fixed"):
@@ -179,20 +179,16 @@ class MEASE:
         except (ValueError, TypeError):
             return -1
 
-    def _update_mutation_crossover_rates(self):
+    def _update_mutation_crossover_rates(self, p_prev_topk: pd.DataFrame, p_curr_topk: pd.DataFrame):
         if self.rate_policy == "fixed":
             return
 
-        if (
-            self.prev_best_by_key == self.best_by_key
-            and self.mutation_rate <= 80
-            and self.crossover_rate >= RATES_CHANGE_FATOR
-        ):
+        if p_curr_topk.equals(p_prev_topk) and self.mutation_rate <= 80 and self.crossover_rate >= RATES_CHANGE_FATOR:
             self.mutation_rate += RATES_CHANGE_FATOR
             self.crossover_rate -= RATES_CHANGE_FATOR
 
         if (
-            self.prev_best_by_key != self.best_by_key
+            not p_curr_topk.equals(p_prev_topk)
             and self.mutation_rate >= RATES_CHANGE_FATOR
             and self.crossover_rate <= 80
         ):
@@ -200,6 +196,8 @@ class MEASE:
             self.crossover_rate += RATES_CHANGE_FATOR
 
     def _check_stop(self, gen_count):
+        prev_top_k_df = pd.DataFrame(self.prev_best_by_key)
+        curr_top_k_df = pd.DataFrame(self.best_by_key)
         if gen_count >= self.max_generations:
             return False
 
@@ -213,21 +211,23 @@ class MEASE:
 
             return False
 
-        if self.prev_best_by_key == {}:
+        if prev_top_k_df.empty:
             self.prev_best_by_key = self.best_by_key.copy()
 
             return True
 
-        self._update_mutation_crossover_rates()
+        self._update_mutation_crossover_rates(prev_top_k_df, curr_top_k_df)
         self.prev_best_by_key = self.best_by_key.copy()
 
         return True
 
     def _evaluate_improvement(self, population, fitness_list, restart_prct, dataset):
-        if self.prev_best_by_key == self.best_by_key and self.mutation_rate == 100:
+        prev_top_k_df = pd.DataFrame(self.prev_best_by_key)
+        curr_top_k_df = pd.DataFrame(self.best_by_key)
+        if curr_top_k_df.equals(prev_top_k_df) and self.mutation_rate == 100:
             self.no_improvement_counter += 1
 
-        elif self.prev_best_by_key != self.best_by_key:
+        elif not curr_top_k_df.equals(prev_top_k_df):
             self.no_improvement_counter = 0
             self.restart_counter_consecutive = 0
 
@@ -382,7 +382,7 @@ class MEASE:
                 fitness_list = self.evaluation.get_fitness(population, dataset_x)
 
                 self._update_top_k(population, fitness_list)
-                best_topk_score_register.append(next(reversed(self.best_by_key.values()))[0])
+                best_topk_score_register.append(max(self.top_k_heap[len(self.top_k_heap) // 2 :])[0])
                 best_gen_score_register.append(np.max(fitness_list))
 
                 if fitness_list:

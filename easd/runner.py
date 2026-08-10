@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import matplotlib
 from easd.core import MEASE
-from easd.evaluation import ScoreMetric
 from easd.metrics import compute_run_metrics, output_metrics, calculate_max_f1_score
 
 matplotlib.use("Agg")
@@ -37,7 +36,7 @@ class RunConfig:
     threshold: float = 0.9
     debug_performance: bool = False
     rate_policy: RATEPOLICY = "adaptive"
-    score_metric: ScoreMetric = "legacy_logrank"
+    score_metric: str = "legacy_logrank"
     km_time_bins: int | None = 512
 
 
@@ -113,7 +112,7 @@ def run_dataset(config: RunConfig) -> RunSummary:
         _save_run_outputs(
             dataset_name=dataset_name,
             baseline=config.comparacao,
-            run=run + 28,
+            run=run,
             detailed_rules=detailed_rules,
             runtime=float(runtime),
             mean_rule_size=float(mean_rule_size),

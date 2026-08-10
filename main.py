@@ -45,14 +45,15 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Fitness discrepancy metric. 'legacy_logrank' uses statsmodels survdiff; "
             "'fast_logrank' uses a precomputed log-rank proxy; 'km_cvm' and 'km_abc' "
-            "use weighted Kaplan-Meier curve distances."
+            "use weighted Kaplan-Meier curve distances; 'mdir2', 'mdir3' and 'mdir4' "
+            "use scalable multiple-direction weighted log-rank proxies."
         ),
     )
     parser.add_argument(
         "--km_time_bins",
         type=int,
         default=512,
-        help="Maximum time grid size for km_cvm/km_abc. Use 0 for exact event-time grid.",
+        help="Maximum time grid size for km_cvm/km_abc/mdir*. Use 0 for exact event-time grid.",
     )
     parser.add_argument(
         "--rate_policy",

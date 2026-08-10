@@ -8,12 +8,27 @@ import statsmodels.api as sm
 
 from .dataset import Dataset
 
-ScoreMetric = Literal["legacy_logrank", "fast_logrank", "km_cvm", "km_abc"]
-SCORE_METRICS: tuple[str, ...] = ("legacy_logrank", "fast_logrank", "km_cvm", "km_abc")
+SCORE_METRICS: tuple[str, ...] = (
+    "legacy_logrank",
+    "fast_logrank",
+    "km_cvm",
+    "km_abc",
+    "mdir2",
+    "mdir3",
+    "mdir4",
+)
+KM_GRID_SCORE_METRICS = ("km_cvm", "km_abc", "mdir2", "mdir3", "mdir4")
+MDIR_SCORE_METRICS = ("mdir2", "mdir3", "mdir4")
 
 MIN_RELATIVE_SUPPORT = 0.05
 MAX_RELATIVE_SUPPORT = 0.55
 EPSILON = 1e-12
+
+MDIR_WEIGHT_SETS: dict[str, tuple[tuple[int, int] | str, ...]] = {
+    "mdir2": ((0, 0), "cross"),
+    "mdir3": ((0, 0), (0, 4), "cross"),
+    "mdir4": ((0, 0), (0, 4), (4, 0), "cross"),
+}
 
 
 class RuleEvaluator:
@@ -22,7 +37,7 @@ class RuleEvaluator:
         dataset_obj: Dataset,
         comparacao,
         alpha,
-        score_metric: ScoreMetric = "legacy_logrank",
+        score_metric: str = "legacy_logrank",
         km_time_bins: int | None = 512,
     ):
         if comparacao not in ("complement", "population"):
@@ -61,8 +76,11 @@ class RuleEvaluator:
         self._km_pooled_event_counts = np.array([], dtype=float)
         self._km_pooled_risk_counts = np.array([], dtype=float)
         self._km_pooled_survival = np.array([], dtype=float)
-        if score_metric in ("km_cvm", "km_abc"):
+        self._mdir_weights = np.empty((0, 0), dtype=float)
+        if score_metric in KM_GRID_SCORE_METRICS:
             self._precompute_km_grid()
+        if score_metric in MDIR_SCORE_METRICS:
+            self._precompute_mdir_weights()
 
     def get_covered_mask(self, rule, dataset):
         if not rule or len(rule) < 2 or len(rule[0]) != len(rule[1]):
@@ -111,6 +129,8 @@ class RuleEvaluator:
             discrepancy = self._fast_logrank_score(rule_mask)
         elif self.score_metric in ("km_cvm", "km_abc"):
             discrepancy = self._km_distance_score(rule_mask)
+        elif self.score_metric in MDIR_SCORE_METRICS:
+            discrepancy = self._mdir_score(rule_mask)
         else:
             discrepancy = 0.0
 
@@ -289,6 +309,88 @@ class RuleEvaluator:
         event_counts = np.bincount(rule_event_bins[valid_events], minlength=grid_size).astype(float)
 
         return subject_counts, event_counts
+
+    def _precompute_mdir_weights(self) -> None:
+        if self._km_grid_times.size == 0:
+            return
+
+        survival_before = np.r_[1.0, self._km_pooled_survival[:-1]]
+        pooled_failure_before = np.clip(1.0 - survival_before, 0.0, 1.0)
+
+        weights = []
+        for direction in MDIR_WEIGHT_SETS[self.score_metric]:
+            if direction == "cross":
+                weights.append(1.0 - (2.0 * pooled_failure_before))
+            else:
+                r, g = direction
+                weights.append((pooled_failure_before**r) * ((1.0 - pooled_failure_before) ** g))
+
+        self._mdir_weights = np.vstack(weights).astype(float, copy=False)
+
+    def _mdir_score(self, rule_mask: np.ndarray) -> float:
+        if self._mdir_weights.size == 0:
+            return 0.0
+
+        group_subject_counts, group_event_counts = self._group_km_counts(rule_mask)
+        group_risk_counts = np.cumsum(group_subject_counts[::-1])[::-1]
+
+        pooled_risk_counts = self._km_pooled_risk_counts
+        pooled_event_counts = self._km_pooled_event_counts
+
+        if self.comparacao == "complement":
+            ref_subject_counts = self._km_pooled_subject_counts - group_subject_counts
+            ref_risk_counts = np.cumsum(ref_subject_counts[::-1])[::-1]
+            has_reference = ref_risk_counts > 0.0
+        else:
+            has_reference = pooled_risk_counts > group_risk_counts
+
+        valid = (
+            (group_risk_counts > 0.0)
+            & has_reference
+            & (pooled_risk_counts > 1.0)
+            & (pooled_event_counts > 0.0)
+            & (group_risk_counts < pooled_risk_counts)
+        )
+        if not np.any(valid):
+            return 0.0
+
+        total_risk = pooled_risk_counts[valid]
+        total_events = pooled_event_counts[valid]
+        group_risk = group_risk_counts[valid]
+        group_events = group_event_counts[valid]
+
+        risk_fraction = np.divide(group_risk, total_risk, out=np.zeros_like(group_risk), where=total_risk > 0.0)
+        expected_events = risk_fraction * total_events
+        observed_minus_expected = group_events - expected_events
+
+        finite_population_correction = np.divide(
+            total_risk - total_events,
+            total_risk - 1.0,
+            out=np.zeros_like(total_risk),
+            where=total_risk > 1.0,
+        )
+        variance_base = total_events * risk_fraction * (1.0 - risk_fraction) * finite_population_correction
+        informative = variance_base > EPSILON
+        if not np.any(informative):
+            return 0.0
+
+        weights = self._mdir_weights[:, valid][:, informative]
+        residual = observed_minus_expected[informative]
+        variance_base = variance_base[informative]
+
+        linear_statistic = weights @ residual
+        covariance = (weights * variance_base) @ weights.T
+        if not np.any(np.abs(covariance) > EPSILON):
+            return 0.0
+
+        try:
+            statistic = float(linear_statistic @ np.linalg.pinv(covariance, hermitian=True) @ linear_statistic)
+        except np.linalg.LinAlgError:
+            return 0.0
+
+        if statistic <= 0.0 or not np.isfinite(statistic):
+            return 0.0
+        return float(statistic / (1.0 + statistic))
 
     def _kaplan_meier_from_counts(self, event_counts: np.ndarray, risk_counts: np.ndarray) -> np.ndarray:
         hazards = np.divide(event_counts, risk_counts, out=np.zeros_like(event_counts), where=risk_counts > 0.0)
