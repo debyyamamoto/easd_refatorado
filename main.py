@@ -29,7 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-p", "--population", type=int, default=500, help="Population size.")
     parser.add_argument("--restart_gen", type=int, default=3, help="Generation limit without improvement.")
     parser.add_argument("--restart_pop", type=int, default=3, help="Population restart limit.")
-    parser.add_argument("--restart_pct", type=int, default=10, help="Population percentage restarted each time.")
+    parser.add_argument("--restart_pct", type=float, default=0.10, help="Population percentage restarted each time.")
     parser.add_argument(
         "-comp",
         "--comparacao",

@@ -50,7 +50,7 @@ against faster discrepancy proxies:
 ```bash
 uv run python experiments/artificial_datsets/score_metric_benchmark.py \
   --subjects 10000 50000 100000 \
-  --metrics legacy_logrank fast_logrank km_cvm km_abc \
+  --metrics legacy_logrank fast_logrank km_cvm km_abc mdir2 mdir4 \
   --generations 5 \
   --population 80 \
   --ksize 5

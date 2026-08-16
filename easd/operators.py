@@ -1,12 +1,19 @@
 import random as rd
 import copy
 import numpy as np
+import pandas as pd
 
 
 class GeneticOperators:
     def __init__(self, evaluator, get_best_func):
         self.evaluator = evaluator
         self._get_best = get_best_func
+        self._column_values_cache = {}
+
+    def _column_values(self, dataset: pd.DataFrame, col_index: int):
+        if col_index not in self._column_values_cache:
+            self._column_values_cache[col_index] = dataset[:, col_index]
+        return self._column_values_cache[col_index]
 
     def to_mutate_continuous(self, interval, usage_prct, mutation_option):
         """
@@ -78,10 +85,10 @@ class GeneticOperators:
             elif len(discrete_atr) == 1:
                 new_discrete = []
         # Paper mutation 1: remove a value from the accepted values.
-        elif mutation_option == 2:
+        else:
             if len(discrete_atr) > 1:
                 to_be_altered = rd.randint(0, len(discrete_atr) - 1)
-            elif len(discrete_atr) == 1:
+            else:
                 to_be_altered = 0
 
             idx_discr = rd.randint(0, len(attribute_domain) - 1)
@@ -105,7 +112,7 @@ class GeneticOperators:
                     else:
                         break
                 # Elitism: protect the best individual.
-                if rd_index != self._get_best(mutated_population, fitness_list):
+                if rd_index != self._get_best(fitness_list):
                     # If the rule has only one attribute, mutate it.
                     if len(rule[0]) == 1:
                         atr_qtd = 1
@@ -132,7 +139,7 @@ class GeneticOperators:
                             if type(rule[1][index][0]) == str:
                                 mutation_option = rd.randint(1, 3)
                                 rule[1][index] = self.to_mutate_discrete(
-                                    rule[1][index], dataset[:, col_index], mutation_option
+                                    rule[1][index], self._column_values(dataset, col_index), mutation_option
                                 )
                             else:
                                 mutation_option = rd.randint(1, 9)
@@ -144,7 +151,7 @@ class GeneticOperators:
                             if type(rule[1][index][0]) == str:
                                 mutation_option = rd.randint(1, 2)
                                 rule[1][index] = self.to_mutate_discrete(
-                                    rule[1][index], dataset[:, col_index], mutation_option
+                                    rule[1][index], self._column_values(dataset, col_index), mutation_option
                                 )
                             else:
                                 mutation_option = rd.randint(1, 8)

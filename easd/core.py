@@ -24,21 +24,31 @@ RATEPOLICY = Literal["adaptive", "fixed"]
 console = Console()
 
 
+def _normalize_restart_percentage(restart_percentage: float) -> float:
+    if restart_percentage < 0:
+        raise ValueError("restart_percentage must be non-negative.")
+    if restart_percentage > 100:
+        raise ValueError("restart_percentage must be between 0 and 100 percent.")
+    if restart_percentage > 1:
+        return restart_percentage / 100
+    return restart_percentage
+
+
 class MEASE:
     def __init__(
         self,
         data: pd.DataFrame,
         time_col: str,
         event_col: str,
-        max_generations,
-        population_size,
-        max_generations_no_improve,
-        max_pop_restarts,
-        restart_percentage,
-        seed_val,
+        max_generations: int,
+        population_size: int,
+        max_generations_no_improve: int,
+        max_pop_restarts: int,
+        restart_percentage: float,
+        seed_val: int,
         comparacao: str,
-        alpha,
-        ksize,
+        alpha: float,
+        ksize: int,
         plot_n_rules: int,
         coverage_threshold: float = 0.8,
         debug_performance: bool = False,
@@ -60,7 +70,7 @@ class MEASE:
         self.population_size = population_size
         self.no_improvement_counter = 0
         self.restart_counter_consecutive = 0
-        self.restart_percentage = restart_percentage
+        self.restart_percentage = _normalize_restart_percentage(restart_percentage)
         self.max_generations_no_improve = max_generations_no_improve
         self.max_pop_restarts = max_pop_restarts
         self.seed = seed_val
@@ -88,19 +98,7 @@ class MEASE:
         self.debug_performance = debug_performance
 
     def _get_mask(self, rule: list[list]):
-        mask = np.ones(len(self.dataset_obj._original_data), dtype=bool)
-        attributes, intervals = rule[0], rule[1]
-
-        for attr_idx, interval in zip(attributes, intervals):
-            col = self.dataset_obj.get_col_name(attr_idx)
-            s = self.dataset_obj._original_data[col]
-
-            if self.dataset_obj._original_data[col].dtype == "string":
-                mask &= s.isin(interval).to_numpy()
-            else:
-                mask &= ((s >= interval[0]) & (s <= interval[1])).to_numpy()
-
-        return mask
+        return self.dataset_obj.get_rule_mask(rule)
 
     def _jaccard_test(self, mask1, mask2):
         intersection = np.logical_and(mask1, mask2).sum()
@@ -133,45 +131,43 @@ class MEASE:
         return False, new_mask
 
     def _adjust_interval(self, rule, dataset):
-        df = pd.DataFrame(dataset)
+
         for i in range(len(rule[0])):
             if type(rule[1][i][0]) == str:
-                pass
-            else:
-                min_val = np.min(df[rule[0][i]])
-                max_val = np.max(df[rule[0][i]])
-                c_min, c_max = True, True
+                continue
+            col_index = rule[0][i]
+            col_values = np.asarray(dataset[:, col_index], dtype=np.float64)
+            min_val = col_values.min()
+            max_val = col_values.max()
+            c_min, c_max = True, True
 
-                if rule[1][i][0] < min_val:
-                    rule[1][i][0] = min_val
-                    c_min = False
+            if rule[1][i][0] < min_val:
+                rule[1][i][0] = min_val
+                c_min = False
 
-                if rule[1][i][1] > max_val:
-                    rule[1][i][1] = max_val
-                    c_max = False
+            if rule[1][i][1] > max_val:
+                rule[1][i][1] = max_val
+                c_max = False
 
-                int_max_val = rule[1][i][1]
-                idx = rule[0][i]
+            int_max_val = rule[1][i][1]
 
-                if c_max:
-                    to_max_ordered = df[idx].apply(lambda x: abs(x - int_max_val)).sort_values()
-                    indexes = to_max_ordered.index[:1]
-                    rule[1][i][1] = df[idx].loc[indexes[0]]
+            if c_max:
+                nearest_idx = np.argmin(np.abs(col_values - int_max_val))
+                rule[1][i][1] = col_values[nearest_idx]
 
-                if c_min:
-                    int_min_val = rule[1][i][0]
-                    to_min_ordered = df[idx].apply(lambda x: abs(x - int_min_val)).sort_values()
-                    indexes = to_min_ordered.index[: len(to_min_ordered)]
-                    for j in range(len(to_min_ordered)):
-                        new_min = df[idx].loc[indexes[j]]
-                        if new_min < int_max_val:
-                            rule[1][i][0] = new_min
-                            break
+            if c_min:
+                int_min_val = rule[1][i][0]
+                valid_mask = col_values < int_max_val
+                if np.any(valid_mask):
+                    candidates = col_values[valid_mask]
+                    nearest_idx = np.argmin(np.abs(candidates - int_min_val))
+                    rule[1][i][0] = candidates[nearest_idx]
+
         rule = self._label_rules(rule)
 
         return rule
 
-    def _get_best(self, population, fitness_list):
+    def _get_best(self, fitness_list):
         if not fitness_list:
             return -1
         try:
@@ -367,7 +363,8 @@ class MEASE:
         gen_count = 0
         population = self.generator.gen_population(self.population_size, dataset_x)
         gen_mean_fitness, gen_best_fitness = [], []
-        best_topk_score_register, best_gen_score_register = [], []
+        topk_best_fitness_history = []
+        restart_generations = []
 
         with console.status("[bold green] Evolving generations...") as status:
             while self._check_stop(gen_count):
@@ -381,33 +378,35 @@ class MEASE:
 
                 fitness_list = self.evaluation.get_fitness(population, dataset_x)
 
-                self._update_top_k(population, fitness_list)
-                best_topk_score_register.append(max(self.top_k_heap[len(self.top_k_heap) // 2 :])[0])
-                best_gen_score_register.append(np.max(fitness_list))
-
-                if fitness_list:
-                    mean_fit = np.mean(fitness_list)
-                    best_fit = np.max(fitness_list)
-                    gen_mean_fitness.append(mean_fit)
-                    gen_best_fitness.append(best_fit)
-                    if (gen_count + 1) % 50 == 0:
-                        console.log(
-                            f"   Gen {gen_count + 1:3d}: Best={best_fit:.4f} | "
-                            f"Mean={mean_fit:.4f} | Top-K={len(self.best_by_key)}/{self.ksize}"
-                        )
-                else:
+                if not fitness_list:
                     console.print(
                         f"WARNING G{gen_count}: empty population - stopping execution.",
                         style="bold red",
                     )
                     break
 
+                self._update_top_k(population, fitness_list)
+
                 new_population = self._evaluate_improvement(
-                    population, fitness_list, (self.restart_percentage / 100), dataset_x
+                    population, fitness_list, self.restart_percentage, dataset_x
                 )
                 if new_population is not None:
                     population = new_population
+                    restart_generations.append(gen_count + 1)
+                    fitness_list = self.evaluation.get_fitness(population, dataset_x)
                     del new_population
+
+                mean_fit = float(np.mean(fitness_list))
+                best_fit = float(np.max(fitness_list))
+                topk_best_fit = max((element[0] for element in self.best_by_key.values()), default=float("nan"))
+                gen_mean_fitness.append(mean_fit)
+                gen_best_fitness.append(best_fit)
+                topk_best_fitness_history.append(float(topk_best_fit))
+                if (gen_count + 1) % 50 == 0:
+                    console.log(
+                        f"   Gen {gen_count + 1:3d}: Best={best_fit:.4f} | "
+                        f"Mean={mean_fit:.4f} | Top-K={len(self.best_by_key)}/{self.ksize}"
+                    )
 
                 gen_count += 1
 
@@ -463,7 +462,14 @@ class MEASE:
         figures_list = RulesPlotter(
             self.dataset_obj._original_data, final_rules_found, self.survival_event_col, self.survival_time_col
         ).kaplan_meier(self.top_n_plot)
-        figures_list.append(plot_topk_convergency(best_topk_score_register, best_gen_score_register))
+        figures_list.append(
+            plot_topk_convergency(
+                topk_best_fitness_history,
+                gen_best_fitness,
+                gen_mean_fitness,
+                restart_generations,
+            )
+        )
 
         # Info: basic summary.
         common_info = {

@@ -28,7 +28,7 @@ class RunConfig:
     population: int = 500
     restart_gen: int = 3
     restart_pop: int = 3
-    restart_pct: int = 10
+    restart_pct: float = 0.10
     comparacao: BASELINE = "complement"
     alpha: float = 0.5
     ksize: int = 10
