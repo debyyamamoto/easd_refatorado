@@ -24,25 +24,37 @@ RATEPOLICY = Literal["adaptive", "fixed"]
 console = Console()
 
 
+def _normalize_restart_percentage(restart_percentage: float) -> float:
+    if restart_percentage < 0:
+        raise ValueError("restart_percentage must be non-negative.")
+    if restart_percentage > 100:
+        raise ValueError("restart_percentage must be between 0 and 100 percent.")
+    if restart_percentage > 1:
+        return restart_percentage / 100
+    return restart_percentage
+
+
 class MEASE:
     def __init__(
         self,
         data: pd.DataFrame,
         time_col: str,
         event_col: str,
-        max_generations,
-        population_size,
-        max_generations_no_improve,
-        max_pop_restarts,
-        restart_percentage,
-        seed_val,
+        max_generations: int,
+        population_size: int,
+        max_generations_no_improve: int,
+        max_pop_restarts: int,
+        restart_percentage: float,
+        seed_val: int,
         comparacao: str,
-        alpha,
-        ksize,
+        alpha: float,
+        ksize: int,
         plot_n_rules: int,
         coverage_threshold: float = 0.8,
         debug_performance: bool = False,
         rate_policy: RATEPOLICY = "adaptive",
+        score_metric: str = "legacy_logrank",
+        km_time_bins: int | None = 512,
     ):
         if rate_policy not in ("adaptive", "fixed"):
             raise ValueError("rate_policy must be either 'adaptive' or 'fixed'.")
@@ -58,7 +70,7 @@ class MEASE:
         self.population_size = population_size
         self.no_improvement_counter = 0
         self.restart_counter_consecutive = 0
-        self.restart_percentage = restart_percentage
+        self.restart_percentage = _normalize_restart_percentage(restart_percentage)
         self.max_generations_no_improve = max_generations_no_improve
         self.max_pop_restarts = max_pop_restarts
         self.seed = seed_val
@@ -70,7 +82,15 @@ class MEASE:
         self.dataset_obj = Dataset(data, time_col, event_col)
         self.generator = PopulationGenerator()
         self.alpha = alpha
-        self.evaluation = RuleEvaluator(self.dataset_obj, comparacao, self.alpha)
+        self.score_metric = score_metric
+        self.km_time_bins = km_time_bins
+        self.evaluation = RuleEvaluator(
+            self.dataset_obj,
+            comparacao,
+            self.alpha,
+            score_metric=self.score_metric,
+            km_time_bins=self.km_time_bins,
+        )
         self.operators = GeneticOperators(self.evaluation, self._get_best)
         self.top_n_plot = plot_n_rules
         self.coverage_threshold = coverage_threshold
@@ -86,7 +106,7 @@ class MEASE:
         return intersection / union if union > 0.0 else 0.0
 
     def _overlap_coefficient(self, mask1, mask2):
-        intersection = np.logical_and(mask1, mask2)
+        intersection = np.logical_and(mask1, mask2).sum()
         minimum = min(mask1.sum(), mask2.sum())
         return intersection / minimum if minimum > 0 else 0.0
 
@@ -111,6 +131,7 @@ class MEASE:
         return False, new_mask
 
     def _adjust_interval(self, rule, dataset):
+
         for i in range(len(rule[0])):
             if type(rule[1][i][0]) == str:
                 continue
@@ -143,9 +164,10 @@ class MEASE:
                     rule[1][i][0] = candidates[nearest_idx]
 
         rule = self._label_rules(rule)
+        
         return rule
 
-    def _get_best(self, population, fitness_list):
+    def _get_best(self, fitness_list):
         if not fitness_list:
             return -1
         try:
@@ -153,20 +175,16 @@ class MEASE:
         except (ValueError, TypeError):
             return -1
 
-    def _update_mutation_crossover_rates(self):
+    def _update_mutation_crossover_rates(self, p_prev_topk: pd.DataFrame, p_curr_topk: pd.DataFrame):
         if self.rate_policy == "fixed":
             return
 
-        if (
-            self.prev_best_by_key == self.best_by_key
-            and self.mutation_rate <= 80
-            and self.crossover_rate >= RATES_CHANGE_FATOR
-        ):
+        if p_curr_topk.equals(p_prev_topk) and self.mutation_rate <= 80 and self.crossover_rate >= RATES_CHANGE_FATOR:
             self.mutation_rate += RATES_CHANGE_FATOR
             self.crossover_rate -= RATES_CHANGE_FATOR
 
         if (
-            self.prev_best_by_key != self.best_by_key
+            not p_curr_topk.equals(p_prev_topk)
             and self.mutation_rate >= RATES_CHANGE_FATOR
             and self.crossover_rate <= 80
         ):
@@ -174,6 +192,8 @@ class MEASE:
             self.crossover_rate += RATES_CHANGE_FATOR
 
     def _check_stop(self, gen_count):
+        prev_top_k_df = pd.DataFrame(self.prev_best_by_key)
+        curr_top_k_df = pd.DataFrame(self.best_by_key)
         if gen_count >= self.max_generations:
             return False
 
@@ -187,21 +207,23 @@ class MEASE:
 
             return False
 
-        if self.prev_best_by_key == {}:
+        if prev_top_k_df.empty:
             self.prev_best_by_key = self.best_by_key.copy()
 
             return True
 
-        self._update_mutation_crossover_rates()
+        self._update_mutation_crossover_rates(prev_top_k_df, curr_top_k_df)
         self.prev_best_by_key = self.best_by_key.copy()
 
         return True
 
     def _evaluate_improvement(self, population, fitness_list, restart_prct, dataset):
-        if self.prev_best_by_key == self.best_by_key and self.mutation_rate == 100:
+        prev_top_k_df = pd.DataFrame(self.prev_best_by_key)
+        curr_top_k_df = pd.DataFrame(self.best_by_key)
+        if curr_top_k_df.equals(prev_top_k_df) and self.mutation_rate == 100:
             self.no_improvement_counter += 1
 
-        elif self.prev_best_by_key != self.best_by_key:
+        elif not curr_top_k_df.equals(prev_top_k_df):
             self.no_improvement_counter = 0
             self.restart_counter_consecutive = 0
 
@@ -331,6 +353,7 @@ class MEASE:
         console.print(f"   - Population: {self.population_size}")
         console.print(f"   - Generations: {self.max_generations}")
         console.print(f"   - Top-K: {self.ksize} best rules")
+        console.print(f"   - Score metric: {self.score_metric}")
         console.print(
             f"   - Rate policy: {self.rate_policy} "
             f"(crossover={self.crossover_rate}%, mutation={self.mutation_rate}%)"
@@ -340,7 +363,8 @@ class MEASE:
         gen_count = 0
         population = self.generator.gen_population(self.population_size, dataset_x)
         gen_mean_fitness, gen_best_fitness = [], []
-        best_topk_score_register, best_gen_score_register = [], []
+        topk_best_fitness_history = []
+        restart_generations = []
 
         with console.status("[bold green] Evolving generations...") as status:
             while self._check_stop(gen_count):
@@ -354,33 +378,35 @@ class MEASE:
 
                 fitness_list = self.evaluation.get_fitness(population, dataset_x)
 
-                self._update_top_k(population, fitness_list)
-                best_topk_score_register.append(next(reversed(self.best_by_key.values()))[0])
-                best_gen_score_register.append(np.max(fitness_list))
-
-                if fitness_list:
-                    mean_fit = np.mean(fitness_list)
-                    best_fit = np.max(fitness_list)
-                    gen_mean_fitness.append(mean_fit)
-                    gen_best_fitness.append(best_fit)
-                    if (gen_count + 1) % 50 == 0:
-                        console.log(
-                            f"   Gen {gen_count + 1:3d}: Best={best_fit:.4f} | "
-                            f"Mean={mean_fit:.4f} | Top-K={len(self.best_by_key)}/{self.ksize}"
-                        )
-                else:
+                if not fitness_list:
                     console.print(
                         f"WARNING G{gen_count}: empty population - stopping execution.",
                         style="bold red",
                     )
                     break
 
+                self._update_top_k(population, fitness_list)
+
                 new_population = self._evaluate_improvement(
-                    population, fitness_list, (self.restart_percentage / 100), dataset_x
+                    population, fitness_list, self.restart_percentage, dataset_x
                 )
                 if new_population is not None:
                     population = new_population
+                    restart_generations.append(gen_count + 1)
+                    fitness_list = self.evaluation.get_fitness(population, dataset_x)
                     del new_population
+
+                mean_fit = float(np.mean(fitness_list))
+                best_fit = float(np.max(fitness_list))
+                topk_best_fit = max((element[0] for element in self.best_by_key.values()), default=float("nan"))
+                gen_mean_fitness.append(mean_fit)
+                gen_best_fitness.append(best_fit)
+                topk_best_fitness_history.append(float(topk_best_fit))
+                if (gen_count + 1) % 50 == 0:
+                    console.log(
+                        f"   Gen {gen_count + 1:3d}: Best={best_fit:.4f} | "
+                        f"Mean={mean_fit:.4f} | Top-K={len(self.best_by_key)}/{self.ksize}"
+                    )
 
                 gen_count += 1
 
@@ -436,7 +462,14 @@ class MEASE:
         figures_list = RulesPlotter(
             self.dataset_obj._original_data, final_rules_found, self.survival_event_col, self.survival_time_col
         ).kaplan_meier(self.top_n_plot)
-        figures_list.append(plot_topk_convergency(best_topk_score_register, best_gen_score_register))
+        figures_list.append(
+            plot_topk_convergency(
+                topk_best_fitness_history,
+                gen_best_fitness,
+                gen_mean_fitness,
+                restart_generations,
+            )
+        )
 
         # Info: basic summary.
         common_info = {
@@ -444,6 +477,8 @@ class MEASE:
             "total_time": [total_time],
             "mean_size": [mean_size],
             "best_fitness": [final_metrics[1]],
+            "score_metric": [self.score_metric],
+            "km_time_bins": [self.km_time_bins if self.km_time_bins is not None else 0],
             "rate_policy": [self.rate_policy],
             "initial_crossover_rate": [self.initial_crossover_rate],
             "initial_mutation_rate": [self.initial_mutation_rate],

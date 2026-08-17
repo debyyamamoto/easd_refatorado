@@ -28,7 +28,7 @@ class RunConfig:
     population: int = 500
     restart_gen: int = 3
     restart_pop: int = 3
-    restart_pct: int = 10
+    restart_pct: float = 0.10
     comparacao: BASELINE = "complement"
     alpha: float = 0.5
     ksize: int = 10
@@ -36,6 +36,8 @@ class RunConfig:
     threshold: float = 0.9
     debug_performance: bool = False
     rate_policy: RATEPOLICY = "adaptive"
+    score_metric: str = "legacy_logrank"
+    km_time_bins: int | None = 512
 
 
 @dataclass(frozen=True)
@@ -88,6 +90,8 @@ def run_dataset(config: RunConfig) -> RunSummary:
             coverage_threshold=config.threshold,
             debug_performance=config.debug_performance,
             rate_policy=config.rate_policy,
+            score_metric=config.score_metric,
+            km_time_bins=config.km_time_bins,
         )
 
         _, _, _, runtime, _, info, detailed_rules, top_rules, mean_rule_size, figures = sd.run()
@@ -108,7 +112,7 @@ def run_dataset(config: RunConfig) -> RunSummary:
         _save_run_outputs(
             dataset_name=dataset_name,
             baseline=config.comparacao,
-            run=run + 28,
+            run=run,
             detailed_rules=detailed_rules,
             runtime=float(runtime),
             mean_rule_size=float(mean_rule_size),
