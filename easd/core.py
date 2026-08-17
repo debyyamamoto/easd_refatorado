@@ -164,7 +164,7 @@ class MEASE:
                     rule[1][i][0] = candidates[nearest_idx]
 
         rule = self._label_rules(rule)
-
+        
         return rule
 
     def _get_best(self, fitness_list):
